@@ -77,7 +77,7 @@ export const SustainabilityScreen: React.FC<SustainabilityScreenProps> = ({ onNa
 
             <div className="flex flex-wrap gap-4">
               <div className="bg-white/10 backdrop-blur-md px-6 py-3.5 rounded-2xl border border-white/20 min-w-[150px]">
-                <div className="text-[#6ffbbe] font-extrabold text-2xl">100 MT</div>
+                <div className="text-[#6ffbbe] font-extrabold text-2xl">150 MT</div>
                 <div className="text-[#7c839b] text-xs font-medium">Recycling / Month</div>
               </div>
 
@@ -238,7 +238,7 @@ export const SustainabilityScreen: React.FC<SustainabilityScreenProps> = ({ onNa
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div className="bg-white p-5 rounded-2xl border border-[#c6c6cd]">
-              <div className="text-3xl font-extrabold text-[#006c49]">100 MT</div>
+              <div className="text-3xl font-extrabold text-[#006c49]">150 MT</div>
               <div className="text-[#45464d] text-xs font-semibold uppercase tracking-wide mt-1">Recycling / Month</div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-[#c6c6cd]">
