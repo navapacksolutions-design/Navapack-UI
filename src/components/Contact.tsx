@@ -49,15 +49,39 @@ export const ContactScreen: React.FC<ContactScreenProps> = ({ onNavigate, onRequ
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     if (subscribeEmail.trim()) {
-      try { await appsScriptApi.subscribe(subscribeEmail); setSubscribed(true); setSubscribeEmail(''); setTimeout(() => setSubscribed(false), 3500); }
-      catch { setSubscribed(false); }
+      try {
+        await appsScriptApi.subscribe(subscribeEmail);
+        setSubscribed(true);
+        setSubscribeEmail('');
+        setTimeout(() => setSubscribed(false), 3500);
+      } catch {
+        setSubscribed(false);
+      }
     }
   };
 
   const handleInquirySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try { await appsScriptApi.submitInquiry(inquiryForm); setInquirySent(true); }
-    catch { return; }
+
+    // Don't let a failed/slow backend call block the WhatsApp redirect.
+    try {
+      await appsScriptApi.submitInquiry(inquiryForm);
+    } catch (err) {
+      console.error('submitInquiry failed, continuing to WhatsApp redirect:', err);
+    }
+
+    const whatsappMessage = [
+      'Hello NavaPack, I would like to make an inquiry.',
+      '',
+      `Full name: ${inquiryForm.fullName}`,
+      `Company: ${inquiryForm.company}`,
+      `Email: ${inquiryForm.email}`,
+      `Inquiry type: ${inquiryForm.inquiryType}`,
+      `Message: ${inquiryForm.message}`,
+    ].join('\n');
+
+    window.location.href = `https://wa.me/256740817764?text=${encodeURIComponent(whatsappMessage)}`;
+    setInquirySent(true);
     setTimeout(() => {
       setInquirySent(false);
       setInquiryForm({
@@ -173,7 +197,6 @@ export const ContactScreen: React.FC<ContactScreenProps> = ({ onNavigate, onRequ
                   P.O. Box 117814, Plot#22, Ring Road, Nalukolongo Ind Area<br />
                   Kampala, Uganda
                 </p>
-                
               </div>
             </div>
 
@@ -182,7 +205,7 @@ export const ContactScreen: React.FC<ContactScreenProps> = ({ onNavigate, onRequ
               <div className="text-xs text-[#45464d] space-y-1.5 font-medium">
                 <p>info@navapack.co.ug</p>
                 <p>+256 753 349228</p>
-                <p>+256 740 617764</p>
+                <p>+256 740 817764</p>
               </div>
             </div>
 
@@ -380,10 +403,12 @@ export const ContactScreen: React.FC<ContactScreenProps> = ({ onNavigate, onRequ
               <div className="flex flex-col gap-2 text-xs">
                 <a href="tel:+256753349228" className="flex items-center gap-2 font-medium hover:text-[#6ffbbe] transition-colors">
                   <span className="material-symbols-outlined text-sm">call</span>+256 753 349228
-                  <span className="material-symbols-outlined text-sm">call</span>+256 740617764
+                </a>
+                <a href="tel:+256740817764" className="flex items-center gap-2 font-medium hover:text-[#6ffbbe] transition-colors">
+                  <span className="material-symbols-outlined text-sm">call</span>+256 740 817764
                 </a>
                 <a href="mailto:info@navapack.co.ug" className="flex items-center gap-2 font-medium hover:text-[#6ffbbe] transition-colors">
-                  <span className="material-symbols-outlined text-sm">mail</span> info@navapack.co.ug
+                  <span className="material-symbols-outlined text-sm">mail</span> info@navapacksolutions.com
                 </a>
               </div>
             </div>
