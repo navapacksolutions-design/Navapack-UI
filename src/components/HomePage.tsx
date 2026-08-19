@@ -118,7 +118,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onRequestQuote }
         <div className="max-w-7xl mx-auto px-6 md:px-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div className="p-4 border-r border-[#e0e3e5] last:border-r-0">
-              <div className="font-medium tabular-nums text-[#006c49] text-3xl sm:text-4xl mb-1"><AnimatedStat value={100} suffix="MT" /></div>
+              <div className="font-medium tabular-nums text-[#006c49] text-3xl sm:text-4xl mb-1"><AnimatedStat value={150} suffix="MT" /></div>
               <div className="font-semibold text-xs text-[#45464d] uppercase tracking-wider">Recycling / Month</div>
             </div>
             <div className="p-4 border-r border-[#e0e3e5] last:border-r-0">
