@@ -1,0 +1,6 @@
+{
+  "name": "Navapack Solutions",
+  "description": "Smarter, Greener Supply Chains for African Industry. High-precision extrusion and sustainable circular economy packaging solutions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

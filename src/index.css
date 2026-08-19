@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+:root {
+  --font-heading: 'Sora', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-body);
+  }
+}
+
+@layer utilities {
+  .font-brand-heading {
+    font-family: var(--font-heading);
+  }
+
+  .font-brand-body {
+    font-family: var(--font-body);
+  }
+
+  .hero-headline {
+    font-family: var(--font-heading);
+    font-size: clamp(2.25rem, 5vw, 4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  .hero-body-copy {
+    font-family: var(--font-body);
+    font-size: clamp(1rem, 1.2vw, 1.125rem);
+    font-weight: 400;
+    line-height: 1.6;
+  }
+}
+
+/* Keep Inter as the site-wide working typeface, including Tailwind's font-sans
+   utility on the document body, and reserve Sora for display hierarchy. */
+body.font-sans,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+@keyframes kenburns {
+  0% { transform: scale(1.0); }
+  100% { transform: scale(1.1); }
+}
+
+.ken-burns-bg {
+  animation: kenburns 20s ease-in-out infinite alternate;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.3; transform: translateX(-10%); }
+  50% { opacity: 0.6; transform: translateX(10%); }
+  100% { opacity: 0.3; transform: translateX(-10%); }
+}
+
+.atmospheric-overlay {
+  background: linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%);
+  animation: shimmer 10s infinite linear;
+}
+
+.zebra-list div:nth-child(even) {
+  background-color: #F8FAFC;
+}
