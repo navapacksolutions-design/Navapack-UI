@@ -26,7 +26,7 @@ export const ProductPortfolioScreen: React.FC<ProductPortfolioScreenProps> = ({ 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await fetch('https://navapack-backend.azurewebsites.net/api/products/');
+        const response = await fetch('https://api.navapacksolutions.com/api/products/');
         
         if (!response.ok) {
           throw new Error(`Failed to load products (Status: ${response.status})`);

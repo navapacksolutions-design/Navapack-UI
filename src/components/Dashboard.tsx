@@ -51,7 +51,7 @@ interface Staff {
 }
 
 const ADMIN_KEY = APPS_SCRIPT_ADMIN_KEY;
-const LOCAL_PRODUCTS_API_URL = "https://navapack-backend.azurewebsites.net/api/products/";
+const LOCAL_PRODUCTS_API_URL = "https://api.navapacksolutions.com/api/products/";
 
 type ApiResponse<T> = {
   success: boolean;

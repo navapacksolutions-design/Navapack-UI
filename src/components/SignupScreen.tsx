@@ -54,7 +54,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onN
     setLoading(true);
 
     try {
-      const response = await fetch('https://navapack-backend.azurewebsites.net/api/signup/', {
+      const response = await fetch('https://api.navapacksolutions.com/api/signup/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

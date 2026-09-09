@@ -31,7 +31,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
     setLoading(true);
 
     try {
-      const response = await fetch('https://navapack-backend.azurewebsites.net/api/login/', {
+      const response = await fetch('https://api.navapacksolutions.com/api/login/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
