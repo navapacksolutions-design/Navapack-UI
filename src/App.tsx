@@ -17,6 +17,7 @@ import { AboutUsScreen } from './components/AboutUsScreen';
 import { ContactScreen } from './components/Contact';
 import { LoginScreen } from './components/LoginScreen';
 import { SignupScreen } from './components/SignupScreen';
+import { WhatsAppButton } from './components/WhatsAppButton';
 // import { AdminProductsScreen } from './components/AdminProductsScreen';
 import { Dashboard } from './components/Dashboard';
 
@@ -162,6 +163,7 @@ export default function App() {
   };
 
   const variants = getVariants();
+  const showWhatsAppButton = !['login', 'signup', 'dashboard'].includes(currentScreen);
 
   return (
     <div className="min-h-screen bg-[#f7f9fb] text-[#191c1e] flex flex-col font-sans overflow-x-hidden selection:bg-[#6cf8bb] selection:text-[#002113]">
@@ -371,6 +373,8 @@ export default function App() {
         onNavigate={handleNavigate}
         currentScreen={currentScreen}
       />
+
+      {showWhatsAppButton && <WhatsAppButton />}
 
       {/* =========================
           QUOTE MODAL
