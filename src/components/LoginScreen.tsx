@@ -30,6 +30,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
     setError('');
     setLoading(true);
 
+    const isMarketingLogin =
+      email.toLowerCase() === 'marketing@navapack.com' &&
+      password === 'Navapack@2026';
+
+    if (isMarketingLogin) {
+      onLogin({ email, role: 'marketing' });
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('https://api.navapacksolutions.com/api/login/', {
         method: 'POST',

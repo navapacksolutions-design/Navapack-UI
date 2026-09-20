@@ -1,4 +1,4 @@
-export type ScreenId = 'home' | 'products' | 'sustainability' | 'about' | 'contact' | 'login' | 'signup' | 'admin-products' | 'dashboard';
+export type ScreenId = 'home' | 'products' | 'sustainability' | 'about' | 'contact' | 'login' | 'signup' | 'admin-products' | 'dashboard' | 'marketing-dashboard';
 
 export type TransitionType = 'push' | 'push_back' | 'none';
 

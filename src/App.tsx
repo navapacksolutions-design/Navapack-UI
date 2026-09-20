@@ -20,6 +20,7 @@ import { SignupScreen } from './components/SignupScreen';
 import { WhatsAppButton } from './components/WhatsAppButton';
 // import { AdminProductsScreen } from './components/AdminProductsScreen';
 import { Dashboard } from './components/Dashboard';
+import MarketingDashboard from './components/marketing_dashbrod.jsx';
 
 export default function App() {
   // Get current screen from URL
@@ -36,6 +37,7 @@ export default function App() {
       'signup',
       'admin-products',
       'dashboard',
+      'marketing-dashboard',
     ];
 
     return validScreens.includes(path)
@@ -163,7 +165,7 @@ export default function App() {
   };
 
   const variants = getVariants();
-  const showWhatsAppButton = !['login', 'signup', 'dashboard'].includes(currentScreen);
+  const showWhatsAppButton = !['login', 'signup', 'dashboard', 'marketing-dashboard'].includes(currentScreen);
 
   return (
     <div className="min-h-screen bg-[#f7f9fb] text-[#191c1e] flex flex-col font-sans overflow-x-hidden selection:bg-[#6cf8bb] selection:text-[#002113]">
@@ -172,7 +174,7 @@ export default function App() {
           NAVBAR
       ========================== */}
 
-      {currentScreen !== 'dashboard' && (
+      {!['dashboard', 'marketing-dashboard'].includes(currentScreen) && (
         <Navbar
           currentScreen={currentScreen}
           onNavigate={handleNavigate}
@@ -298,9 +300,11 @@ export default function App() {
 
             {currentScreen === 'login' && (
               <LoginScreen
-                onLogin={() =>
+                onLogin={(user) =>
                   handleNavigate(
-                    'dashboard',
+                    user.role === 'marketing'
+                      ? 'marketing-dashboard'
+                      : 'dashboard',
                     'none'
                   )
                 }
@@ -357,6 +361,17 @@ export default function App() {
             {currentScreen ===
               'dashboard' && (
               <Dashboard />
+            )}
+
+            {currentScreen === 'marketing-dashboard' && (
+              <MarketingDashboard
+                onLogout={() =>
+                  handleNavigate(
+                    'login',
+                    'push_back'
+                  )
+                }
+              />
             )}
 
           </motion.div>
