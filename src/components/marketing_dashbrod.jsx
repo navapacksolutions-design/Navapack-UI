@@ -21,6 +21,7 @@ const INITIAL_PRODUCTS = [
 const PIPELINE_API_URL = 'https://api.navapacksolutions.com/api/pipeline/';
 const ACTIVITY_API_URL = 'https://api.navapacksolutions.com/api/daily-activities/';
 const SALESPERSON_API_URL = 'https://api.navapacksolutions.com/api/salespersons/';
+const DASHBOARD_METRICS_API_URL = 'https://api.navapacksolutions.com/api/dashboard-metrics/';
 
 const normalizeSalespersonApiPayload = (form) => ({
   name: form.name || '',
@@ -176,6 +177,35 @@ const normalizeActivityRecord = (item, fallbackId) => ({
   respDept: item?.responsible_person_dept || '',
   requiredByDate: item?.required_by_date || '',
   issueStatus: normalizeStatusLabel(item?.issue_status)
+});
+
+const normalizeDashboardMetrics = (payload) => ({
+  criticalAction: {
+    overdueFollowUps: Number(payload?.critical_action?.overdue_followups || 0),
+    dueToday: Number(payload?.critical_action?.due_today || 0),
+    noDateSet: Number(payload?.critical_action?.no_date_set || 0)
+  },
+  pipelineHealth: {
+    activeOpportunities: Number(payload?.pipeline_health?.active_opportunities || 0),
+    totalPipelineValue: Number(payload?.pipeline_health?.total_pipeline_value || 0),
+    quotationsPending: Number(payload?.pipeline_health?.quotations_pending || 0)
+  },
+  monthlyPerformance: {
+    ordersWonMTD: Number(payload?.monthly_performance?.orders_won_mtd || 0),
+    totalOrderValueUGX: Number(payload?.monthly_performance?.total_order_value_ugx || 0),
+    cashCollectedUGX: Number(payload?.monthly_performance?.cash_collected_ugx || 0)
+  },
+  salespersonMatrix: Array.isArray(payload?.salesperson_matrix)
+    ? payload.salesperson_matrix.map((person) => ({
+      salespersonId: person.salesperson_id,
+      salespersonName: person.salesperson_name || 'Unknown',
+      totalProspects: Number(person.total_prospects || 0),
+      activePipelineValue: Number(person.active_pipeline_value || 0),
+      quotationsPending: Number(person.quotations_pending || 0),
+      ordersWonValue: Number(person.orders_won_value || 0),
+      overdueFollowUps: Number(person.overdue_followups || 0)
+    }))
+    : []
 });
 
 // Initial Customer Pipeline Dataset (29 fields compliant)
@@ -428,6 +458,8 @@ export default function App({ onLogout, department = 'marketing' }) {
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
   const [salespersonData, setSalespersonData] = useState([]);
+  const [dashboardMetrics, setDashboardMetrics] = useState(null);
+  const [dashboardMetricsError, setDashboardMetricsError] = useState('');
   const [salespersonForm, setSalespersonForm] = useState({
     id: '',
     name: '',
@@ -619,6 +651,25 @@ useEffect(() => {
     });
 }, []);
 
+// Dashboard aggregate metrics API
+useEffect(() => {
+  fetch(DASHBOARD_METRICS_API_URL)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed to fetch dashboard metrics (${response.status})`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      setDashboardMetrics(normalizeDashboardMetrics(data));
+      setDashboardMetricsError('');
+    })
+    .catch(error => {
+      console.error('Error fetching dashboard metrics:', error);
+      setDashboardMetricsError('Live dashboard metrics are unavailable. Showing local data.');
+    });
+}, []);
+
 
 
 
@@ -643,7 +694,7 @@ useEffect(() => {
     const totalOrderValueUGX = ordersWon.reduce((sum, item) => sum + Number(item.actualOrderValue || item.estValue || 0), 0);
     const cashCollectedUGX = activityData.reduce((sum, item) => sum + Number(item.cashCollected || 0), 0);
 
-    return {
+    const fallbackMetrics = {
       overdueFollowUps,
       followUpsToday,
       noDateSetAlert,
@@ -654,7 +705,21 @@ useEffect(() => {
       totalOrderValueUGX,
       cashCollectedUGX
     };
-  }, [pipelineData, activityData]);
+
+    if (!dashboardMetrics) return fallbackMetrics;
+
+    return {
+      overdueFollowUps: dashboardMetrics.criticalAction.overdueFollowUps,
+      followUpsToday: dashboardMetrics.criticalAction.dueToday,
+      noDateSetAlert: dashboardMetrics.criticalAction.noDateSet,
+      activeOpportunitiesCount: dashboardMetrics.pipelineHealth.activeOpportunities,
+      totalPipelineVal: dashboardMetrics.pipelineHealth.totalPipelineValue,
+      quotationsPending: dashboardMetrics.pipelineHealth.quotationsPending,
+      ordersWonMTD: dashboardMetrics.monthlyPerformance.ordersWonMTD,
+      totalOrderValueUGX: dashboardMetrics.monthlyPerformance.totalOrderValueUGX,
+      cashCollectedUGX: dashboardMetrics.monthlyPerformance.cashCollectedUGX
+    };
+  }, [pipelineData, activityData, dashboardMetrics]);
 
   const handleSavePipeline = async (e) => {
     e.preventDefault();
@@ -1017,6 +1082,12 @@ useEffect(() => {
           {/* ======================================================== */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
+              {dashboardMetricsError && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{dashboardMetricsError}</span>
+                </div>
+              )}
               
               {/* Top Metric Cards Section */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -1127,32 +1198,31 @@ useEffect(() => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
-                      {salespersons.map(rep => {
-                        const repProspects = pipelineData.filter(i => i.salesperson === rep);
-                        const totalProspects = repProspects.length;
-                        const activePipelineVal = repProspects
-                          .filter(i => i.salesStage !== 'Order Won' && i.salesStage !== 'Order Lost')
-                          .reduce((sum, i) => sum + Number(i.estValue || 0), 0);
-                        const quotesPending = repProspects.filter(i => i.salesStage === 'Quotation Sent').length;
-                        const ordersWonVal = repProspects
-                          .filter(i => i.salesStage === 'Order Won')
-                          .reduce((sum, i) => sum + Number(i.actualOrderValue || i.estValue || 0), 0);
-                        const overdue = repProspects.filter(i => {
-                          if (!i.nextFollowUpDate) return false;
-                          return new Date(i.nextFollowUpDate) < new Date('2026-09-10') && i.salesStage !== 'Order Won' && i.salesStage !== 'Order Lost';
-                        }).length;
+                      {(dashboardMetrics?.salespersonMatrix || salespersons.map(rep => ({
+                        salespersonName: rep,
+                        totalProspects: pipelineData.filter(i => i.salesperson === rep).length,
+                        activePipelineValue: pipelineData
+                          .filter(i => i.salesperson === rep && i.salesStage !== 'Order Won' && i.salesStage !== 'Order Lost')
+                          .reduce((sum, i) => sum + Number(i.estValue || 0), 0),
+                        quotationsPending: pipelineData.filter(i => i.salesperson === rep && i.salesStage === 'Quotation Sent').length,
+                        ordersWonValue: pipelineData
+                          .filter(i => i.salesperson === rep && i.salesStage === 'Order Won')
+                          .reduce((sum, i) => sum + Number(i.actualOrderValue || i.estValue || 0), 0),
+                        overdueFollowUps: pipelineData.filter(i => i.salesperson === rep && i.nextFollowUpDate && new Date(i.nextFollowUpDate) < new Date('2026-09-10') && i.salesStage !== 'Order Won' && i.salesStage !== 'Order Lost').length
+                      }))).map((person) => {
+                        const rep = person.salespersonName;
 
                         return (
                           <tr key={rep} className="hover:bg-slate-50 transition-colors">
                             <td className="p-3 font-semibold text-slate-800 border-r border-slate-200">{rep}</td>
-                            <td className="p-3 text-center border-r border-slate-200">{totalProspects}</td>
-                            <td className="p-3 text-right font-medium text-slate-700 border-r border-slate-200">{formatUGX(activePipelineVal)}</td>
-                            <td className="p-3 text-center border-r border-slate-200 bg-yellow-50 text-yellow-800 font-bold">{quotesPending}</td>
-                            <td className="p-3 text-right font-medium text-emerald-700 border-r border-slate-200">{formatUGX(ordersWonVal)}</td>
+                            <td className="p-3 text-center border-r border-slate-200">{person.totalProspects}</td>
+                            <td className="p-3 text-right font-medium text-slate-700 border-r border-slate-200">{formatUGX(person.activePipelineValue)}</td>
+                            <td className="p-3 text-center border-r border-slate-200 bg-yellow-50 text-yellow-800 font-bold">{person.quotationsPending}</td>
+                            <td className="p-3 text-right font-medium text-emerald-700 border-r border-slate-200">{formatUGX(person.ordersWonValue)}</td>
                             <td className="p-3 text-center">
-                              {overdue > 0 ? (
+                              {person.overdueFollowUps > 0 ? (
                                 <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-pink-100 text-pink-700">
-                                  {overdue}
+                                  {person.overdueFollowUps}
                                 </span>
                               ) : (
                                 <span className="text-slate-400">0</span>
