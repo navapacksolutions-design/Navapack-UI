@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
@@ -264,13 +264,16 @@ const formatUGX = (amount) => {
 
 export default function App({ onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [pipelineData, setPipelineData] = useState(INITIAL_PIPELINE);
-  const [activityData, setActivityData] = useState(INITIAL_DAILY_ACTIVITIES);
-  const [salespersons, setSalespersons] = useState(INITIAL_SALESPERSONS);
+  const [pipelineData, setPipelineData] = useState([]);
+  const [activityData, setActivityData] = useState([]);
+  const [salespersonData, setSalespersonData] = useState([]);
   const [salesStages, setSalesStages] = useState(INITIAL_SALES_STAGES);
   const [customerTypes, setCustomerTypes] = useState(INITIAL_CUSTOMER_TYPES);
   const [departments, setDepartments] = useState(INITIAL_DEPTS);
   const [issueStatuses, setIssueStatuses] = useState(INITIAL_ISSUE_STATUSES);
+  const salespersons = salespersonData.length > 0
+  ? salespersonData.map(person => person.name)
+  : INITIAL_SALESPERSONS;
 
   // Search & Filter States
   const [pipelineSearch, setPipelineSearch] = useState('');
@@ -360,6 +363,115 @@ export default function App({ onLogout }) {
     department: '',
     issueStatus: ''
   });
+  useEffect(() => {
+  fetch('https://api.navapacksolutions.com/api/pipeline/')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to fetch pipeline data');
+      }
+      return response.json();
+    })
+    .then(data => {
+      const formattedData = data.map(item => ({
+        id: item.prospect_id,
+        dateAdded: item.date_added,
+        salesperson: item.salesperson_detail?.name || '',
+        customer: item.customer_company,
+        location: item.location_town,
+        contactPerson: item.contact_person,
+        telephone: item.telephone,
+        customerType: item.customer_type,
+        product: item.product_service,
+        specs: item.requirement_specifications,
+        estQty: item.estimated_quantity,
+        unit: item.unit,
+        estValue: Number(item.estimated_value_ugx),
+        lastContactDate: item.last_contact_date,
+        lastDiscussion: item.last_discussion_feedback,
+        nextAction: item.next_action,
+        nextFollowUpDate: item.next_followup_date,
+        followUpStatus: item.followup_status,
+        salesStage: item.sales_stage,
+        probability: item.probability_pct,
+        quotationNo: item.quotation_no,
+        quotationValue: Number(item.quotation_value_ugx),
+        sampleStatus: item.sample_trial_status,
+        actualOrderValue: Number(item.actual_order_value_ugx),
+        reasonLost: item.reason_lost,
+        remarks: item.remarks_management_notes,
+        competitor: item.competitor_won_by,
+        stageLastUpdated: item.stage_last_updated,
+        correctiveAction: item.corrective_action
+      }));
+
+      setPipelineData(formattedData);
+    })
+    .catch(error => {
+      console.error('Error fetching pipeline data:', error);
+    });
+}, []);
+// Daily Activity API
+useEffect(() => {
+  fetch('https://api.navapacksolutions.com/api/daily-activities/')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to fetch daily activities');
+      }
+      return response.json();
+    })
+    .then(data => {
+      const formattedData = data.map(item => ({
+        id: item.id,
+        date: item.date,
+        salesperson: item.salesperson_detail?.name || '',
+        areaRoute: item.area_route_visited || '',
+        customer: item.customer_company || '',
+        specificLocation: item.specific_location || '',
+        prospectStatus: item.prospect_status || '',
+        contactPerson: item.contact_person || '',
+        telephone: item.telephone || '',
+        product: item.product_service || '',
+        activityType: item.activity_type || '',
+        reqEstVolume: item.requirement_estimated_volume || '',
+        discussionOutcome: item.discussion_outcome || '',
+        nextAction: item.next_action || '',
+        nextFollowUpDate: item.next_followup_date || '',
+        quotationSubmittedValue: Number(item.quotation_submitted_value_ugx) || 0,
+        orderReceivedValue: Number(item.order_received_value_ugx) || 0,
+        cashCollected: Number(item.cash_collected_ugx) || 0,
+        marketIntel: item.market_competitor_intelligence || '',
+        mgmtSupportNeeded: item.management_support_needed || '',
+        respDept: item.responsible_person_dept || '',
+        requiredByDate: item.required_by_date || '',
+        issueStatus: item.issue_status || ''
+      }));
+
+      setActivityData(formattedData);
+    })
+    .catch(error => {
+      console.error('Error fetching daily activities:', error);
+    });
+}, []);
+// Salesperson API
+useEffect(() => {
+  fetch('https://api.navapacksolutions.com/api/salespersons/')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to fetch salespersons');
+      }
+      return response.json();
+    })
+    .then(data => {
+      console.log('SALESPERSON DATA:', data);
+      setSalespersonData(data);
+    })
+    .catch(error => {
+      console.error('Error fetching salespersons:', error);
+    });
+}, []);
+
+
+
 
   const metrics = useMemo(() => {
     // Critical Action
@@ -500,6 +612,17 @@ export default function App({ onLogout }) {
             >
               <Users className="w-4 h-4" />
               <span>Customer Pipeline</span>
+            </button>
+                        <button
+              onClick={() => setActiveTab('salesperson')}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
+                activeTab === 'salesperson'
+                  ? 'bg-sky-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Salesperson</span>
             </button>
 
             <button
@@ -899,10 +1022,107 @@ export default function App({ onLogout }) {
 
             </div>
           )}
+           {/* ======================================================== */}
+          {/* TAB 3: SALESPERSON                                       */}
+          {/* ======================================================== */}
+          {activeTab === 'salesperson' && (
+            <div className="space-y-4">
+
+              {/* Header */}
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <h2 className="text-lg font-bold text-slate-900">
+                  Salesperson
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Salesperson information from the backend database
+                </p>
+              </div>
+
+              {/* Salesperson Table */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+
+                <div className="p-3 bg-sky-800 text-white flex justify-between items-center text-xs">
+                  <span className="font-semibold uppercase tracking-wider">
+                    Salesperson Database
+                  </span>
+
+                  <span>
+                    Total Records: {salespersonData.length}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+
+                    <thead className="bg-slate-100 text-slate-700 border-b border-slate-200 font-bold">
+                      <tr>
+                        <th className="p-3 border-r border-slate-200">
+                          Name
+                        </th>
+                        <th className="p-3 border-r border-slate-200">
+                          Email
+                        </th>
+                        <th className="p-3 border-r border-slate-200">
+                          Phone
+                        </th>
+                        <th className="p-3 border-r border-slate-200">
+                          Department
+                        </th>
+                        <th className="p-3">
+                          Is Active
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-200">
+                      {salespersonData.map((person) => (
+                        <tr
+                          key={person.id}
+                          className="hover:bg-slate-50 transition-colors"
+                        >
+                          <td className="p-3 border-r border-slate-200 font-medium text-slate-800">
+                            {person.name}
+                          </td>
+
+                          <td className="p-3 border-r border-slate-200 text-slate-600">
+                            {person.email || '-'}
+                          </td>
+
+                          <td className="p-3 border-r border-slate-200 text-slate-600">
+                            {person.phone || '-'}
+                          </td>
+
+                          <td className="p-3 border-r border-slate-200 text-slate-600">
+                            {person.department || '-'}
+                          </td>
+
+                          <td className="p-3">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                person.is_active
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {person.is_active ? 'Yes' : 'No'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          )}
 
           {/* ======================================================== */}
-          {/* TAB 3: DAILY ACTIVITY LOG (22 Columns Datatable)         */}
+          {/* TAB 4: DAILY ACTIVITY LOG (22 Columns Datatable)         */}
           {/* ======================================================== */}
+
+          
           {activeTab === 'activity' && (
             <div className="space-y-4">
               

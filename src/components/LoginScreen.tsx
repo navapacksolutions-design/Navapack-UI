@@ -18,6 +18,8 @@ interface LoginScreenProps {
   onNavigateToSignup?: () => void;
 }
 
+const USERS_API_URL = 'https://api.navapacksolutions.com/api/users/';
+
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToSignup }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +37,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
       password === 'Navapack@2026';
 
     if (isMarketingLogin) {
-      onLogin({ email, role: 'marketing' });
+      onLogin({ email, role: 'marketing', department: 'marketing' });
       setLoading(false);
       return;
     }
@@ -67,7 +69,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
         localStorage.setItem('token', result.token);
       }
 
-      onLogin(result.user || { email });
+      const usersResponse = await fetch(USERS_API_URL, {
+        headers: result.token
+          ? { Authorization: `Bearer ${result.token}` }
+          : undefined,
+      });
+      const usersPayload = await usersResponse.json();
+      const users = Array.isArray(usersPayload)
+        ? usersPayload
+        : usersPayload.results || [];
+      const loggedInUser = users.find(
+        (user: User) => user.email?.toLowerCase() === email.toLowerCase(),
+      );
+
+      onLogin({ ...(result.user || {}), ...(loggedInUser || {}), email });
     } catch (err) {
       setError('Something went wrong. Please check your backend connection.');
     } finally {

@@ -10,6 +10,7 @@ export interface ProductItem {
   description: string;
   tag: string;
   imageUrl: string;
+  active?: boolean;
 }
 
 export interface AdminProduct extends ProductItem {

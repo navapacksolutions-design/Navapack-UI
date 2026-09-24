@@ -301,13 +301,13 @@ export default function App() {
             {currentScreen === 'login' && (
               <LoginScreen
                 onLogin={(user) =>
-                  handleNavigate(
-                    user.role === 'marketing'
-                      ? 'marketing-dashboard'
-                      : 'dashboard',
-                    'none'
-                  )
-                }
+  handleNavigate(
+    user.department?.toLowerCase() === 'marketing'
+      ? 'marketing-dashboard'
+      : 'dashboard',
+    'none'
+  )
+}
                 onNavigateToSignup={() =>
                   handleNavigate(
                     'signup',
