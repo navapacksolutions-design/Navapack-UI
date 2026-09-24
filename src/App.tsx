@@ -300,14 +300,15 @@ export default function App() {
 
             {currentScreen === 'login' && (
               <LoginScreen
-                onLogin={(user) =>
-  handleNavigate(
-    user.department?.toLowerCase() === 'marketing'
-      ? 'marketing-dashboard'
-      : 'dashboard',
-    'none'
-  )
-}
+                onLogin={(user) => {
+                  const department = user.department?.trim().toLowerCase();
+                  handleNavigate(
+                    department === 'sales' || department === 'marketing'
+                      ? 'marketing-dashboard'
+                      : 'dashboard',
+                    'none'
+                  );
+                }}
                 onNavigateToSignup={() =>
                   handleNavigate(
                     'signup',

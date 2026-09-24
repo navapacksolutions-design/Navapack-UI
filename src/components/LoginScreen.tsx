@@ -32,8 +32,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
     setError('');
     setLoading(true);
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const isMarketingLogin =
-      email.toLowerCase() === 'marketing@navapack.com' &&
+      normalizedEmail === 'marketing@navapack.com' &&
       password === 'Navapack@2026';
 
     if (isMarketingLogin) {
@@ -79,7 +81,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
         ? salespersonsPayload
         : salespersonsPayload.results || [];
       const loggedInSalesperson = salespersons.find(
-        (salesperson: User) => salesperson.email?.toLowerCase() === email.toLowerCase(),
+        (salesperson: User) => salesperson.email?.trim().toLowerCase() === normalizedEmail,
       );
 
       onLogin({ ...(result.user || {}), ...(loggedInSalesperson || {}), email });
