@@ -47,6 +47,8 @@ export default function App() {
 
   const [currentScreen, setCurrentScreen] =
     useState<ScreenId>(getScreenFromPath);
+  const [loggedInDepartment, setLoggedInDepartment] =
+    useState<string>(() => sessionStorage.getItem('navapack_department') || '');
 
   const [transition, setTransition] =
     useState<TransitionType>('push');
@@ -302,6 +304,8 @@ export default function App() {
               <LoginScreen
                 onLogin={(user) => {
                   const department = user.department?.trim().toLowerCase();
+                  setLoggedInDepartment(department || '');
+                  sessionStorage.setItem('navapack_department', department || '');
                   handleNavigate(
                     department === 'sales' || department === 'marketing'
                       ? 'marketing-dashboard'
@@ -366,11 +370,16 @@ export default function App() {
 
             {currentScreen === 'marketing-dashboard' && (
               <MarketingDashboard
+                department={loggedInDepartment}
                 onLogout={() =>
-                  handleNavigate(
-                    'login',
-                    'push_back'
-                  )
+                  {
+                    setLoggedInDepartment('');
+                    sessionStorage.removeItem('navapack_department');
+                    handleNavigate(
+                      'login',
+                      'push_back'
+                    );
+                  }
                 }
               />
             )}

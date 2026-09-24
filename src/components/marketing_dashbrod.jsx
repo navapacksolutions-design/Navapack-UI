@@ -422,8 +422,9 @@ const formatUGX = (amount) => {
   return 'UGX ' + Number(amount).toLocaleString('en-US');
 };
 
-export default function App({ onLogout }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+export default function App({ onLogout, department = 'marketing' }) {
+  const isSalesUser = department.trim().toLowerCase() === 'sales';
+  const [activeTab, setActiveTab] = useState(isSalesUser ? 'pipeline' : 'dashboard');
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
   const [salespersonData, setSalespersonData] = useState([]);
@@ -700,6 +701,8 @@ useEffect(() => {
   };
 
   const handleDeletePipeline = async (id) => {
+    if (isSalesUser) return;
+
     if (!window.confirm('Are you sure you want to delete this customer prospect record?')) {
       return;
     }
@@ -765,6 +768,8 @@ useEffect(() => {
   };
 
   const handleDeleteActivity = async (id) => {
+    if (isSalesUser) return;
+
     if (!window.confirm('Are you sure you want to delete this activity log?')) {
       return;
     }
@@ -902,6 +907,7 @@ useEffect(() => {
         <nav className="w-full lg:w-72 flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 self-start sticky top-20">
           <div className="text-sm font-semibold text-slate-400 uppercase px-3 py-2">Navigation Menu</div>
           <div className="space-y-1">
+            {!isSalesUser && (
             <button
               onClick={() => setActiveTab('dashboard')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
@@ -913,6 +919,7 @@ useEffect(() => {
               <BarChart3 className="w-4 h-4" />
               <span>Dash Board</span>
             </button>
+            )}
 
             <button
               onClick={() => setActiveTab('pipeline')}
@@ -925,6 +932,7 @@ useEffect(() => {
               <Users className="w-4 h-4" />
               <span>Customer Pipeline</span>
             </button>
+            {!isSalesUser && (
                         <button
               onClick={() => setActiveTab('salesperson')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
@@ -936,6 +944,7 @@ useEffect(() => {
               <Users className="w-4 h-4" />
               <span>Salesperson</span>
             </button>
+            )}
 
             <button
               onClick={() => setActiveTab('activity')}
@@ -949,6 +958,7 @@ useEffect(() => {
               <span>Daily Activity</span>
             </button>
 
+            {!isSalesUser && (
             <button
               onClick={() => setActiveTab('weekly')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
@@ -960,7 +970,9 @@ useEffect(() => {
               <FileText className="w-4 h-4" />
               <span>Weekly Report</span>
             </button>
+            )}
 
+            {!isSalesUser && (
             <button
               onClick={() => setActiveTab('lists')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
@@ -972,6 +984,7 @@ useEffect(() => {
               <List className="w-4 h-4" />
               <span>Master Lists</span>
             </button>
+            )}
           </div>
 
           <button
@@ -1199,6 +1212,7 @@ useEffect(() => {
                 </div>
 
                 <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
+                  {!isSalesUser && (
                   <button
                     onClick={() => {
                       setPipelineForm(emptyPipelineForm);
@@ -1209,6 +1223,7 @@ useEffect(() => {
                     <Plus className="w-4 h-4" />
                     <span>Add New Prospect</span>
                   </button>
+                  )}
                 </div>
               </div>
 
@@ -1277,6 +1292,7 @@ useEffect(() => {
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
+                            {!isSalesUser && (
                             <button
                               onClick={() => handleDeletePipeline(item.id)}
                               className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-red-600"
@@ -1284,6 +1300,7 @@ useEffect(() => {
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
+                            )}
                           </td>
                           <td className="p-2 border-r border-slate-200 font-mono font-medium text-sky-900">{item.prospectId || item.id}</td>
                           <td className="p-2 border-r border-slate-200 font-mono text-slate-500">{item.id}</td>
@@ -1502,6 +1519,7 @@ useEffect(() => {
                   />
                 </div>
 
+                {!isSalesUser && (
                 <button
                   onClick={() => {
                     setActivityForm(emptyActivityForm);
@@ -1512,6 +1530,7 @@ useEffect(() => {
                   <Plus className="w-4 h-4" />
                   <span>Log New Daily Activity</span>
                 </button>
+                )}
               </div>
 
               {/* Data Table */}
@@ -1562,6 +1581,7 @@ useEffect(() => {
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
+                            {!isSalesUser && (
                             <button
                               onClick={() => handleDeleteActivity(log.id)}
                               className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-red-600"
@@ -1569,6 +1589,7 @@ useEffect(() => {
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
+                            )}
                           </td>
                           <td className="p-2 border-r border-slate-200 font-mono text-slate-900">{log.id}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-600">{log.date}</td>
