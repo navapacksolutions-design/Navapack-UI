@@ -12,11 +12,171 @@ const INITIAL_SALES_STAGES = [
 ];
 const INITIAL_CUSTOMER_TYPES = ['Manufacturer', 'Wholesaler', 'Retailer', 'Corporate', 'Government', 'Distributor'];
 const INITIAL_DEPTS = ['Sales', 'Production', 'Quality Control', 'Accounts/Finance', 'Logistics/Dispatch', 'Management'];
-const INITIAL_ISSUE_STATUSES = ['Open', 'In Progress', 'On Hold', 'Resolved'];
+const INITIAL_ISSUE_STATUSES = ['Pending', 'On Hold', 'Resolved'];
 const INITIAL_PRODUCTS = [
   'Customized Printed Polythene Bags', 'Plain HDPE Bags', 'LDPE Packaging Rolls', 
   'Biodegradable Carrier Bags', 'Industrial Shrink Wrap'
 ];
+
+const PIPELINE_API_URL = 'https://api.navapacksolutions.com/api/pipeline/';
+const ACTIVITY_API_URL = 'https://api.navapacksolutions.com/api/daily-activities/';
+const SALESPERSON_API_URL = 'https://api.navapacksolutions.com/api/salespersons/';
+
+const normalizeSalespersonApiPayload = (form) => ({
+  name: form.name || '',
+  email: form.email || '',
+  phone: form.phone || '',
+  department: form.department || 'Sales',
+  is_active: Boolean(form.is_active)
+});
+
+const normalizeSalespersonRecord = (item, fallbackId = null) => ({
+  id: item?.id ?? fallbackId,
+  name: item?.name || '',
+  email: item?.email || '',
+  phone: item?.phone || '',
+  department: item?.department || 'Sales',
+  is_active: item?.is_active ?? true,
+  created_at: item?.created_at || ''
+});
+
+const normalizeStatusLabel = (value) => {
+  if (!value) return 'Pending';
+  const text = String(value).trim();
+  const mapping = {
+    PENDING: 'Pending',
+    OVERDUE: 'Overdue',
+    COMPLETED: 'Completed',
+    OPEN: 'Pending',
+    'IN PROGRESS': 'Pending',
+    'ON HOLD': 'On Hold',
+    RESOLVED: 'Resolved'
+  };
+  return mapping[text.toUpperCase()] || text;
+};
+
+const normalizePipelineApiPayload = (form, salespersonMap = []) => {
+  const salespersonId = salespersonMap.find(person => person.name === form.salesperson)?.id ?? form.salesperson;
+
+  return {
+    date_added: form.dateAdded || '',
+    salesperson: salespersonId,
+    customer_company: form.customer || '',
+    location_town: form.location || '',
+    contact_person: form.contactPerson || '',
+    telephone: form.telephone || '',
+    customer_type: form.customerType || '',
+    product_service: form.product || '',
+    requirement_specifications: form.specs || '',
+    estimated_quantity: form.estQty || '',
+    unit: form.unit || 'Pcs',
+    estimated_value_ugx: Number(form.estValue || 0),
+    last_contact_date: form.lastContactDate || '',
+    last_discussion_feedback: form.lastDiscussion || '',
+    next_action: form.nextAction || '',
+    next_followup_date: form.nextFollowUpDate || '',
+    followup_status: (form.followUpStatus || 'Pending').toUpperCase(),
+    sales_stage: form.salesStage || '',
+    probability_pct: Number(form.probability || 0),
+    quotation_no: form.quotationNo || '',
+    quotation_value_ugx: Number(form.quotationValue || 0),
+    sample_trial_status: form.sampleStatus || 'Not Started',
+    actual_order_value_ugx: Number(form.actualOrderValue || 0),
+    reason_lost: form.reasonLost || '',
+    remarks_management_notes: form.remarks || '',
+    competitor_won_by: form.competitor || '',
+    stage_last_updated: form.stageLastUpdated || '',
+    corrective_action: form.correctiveAction || ''
+  };
+};
+
+const normalizePipelineRecord = (item, fallbackId) => ({
+  id: item?.id ?? item?.prospect_id ?? fallbackId,
+  prospectId: item?.prospect_id || '',
+  dateAdded: item?.date_added || '',
+  salesperson: item?.salesperson_detail?.name || item?.salesperson || '',
+  customer: item?.customer_company || '',
+  location: item?.location_town || '',
+  contactPerson: item?.contact_person || '',
+  telephone: item?.telephone || '',
+  customerType: item?.customer_type || '',
+  product: item?.product_service || '',
+  specs: item?.requirement_specifications || '',
+  estQty: item?.estimated_quantity || '',
+  unit: item?.unit || 'Pcs',
+  estValue: Number(item?.estimated_value_ugx || 0),
+  lastContactDate: item?.last_contact_date || '',
+  lastDiscussion: item?.last_discussion_feedback || '',
+  nextAction: item?.next_action || '',
+  nextFollowUpDate: item?.next_followup_date || '',
+  followUpStatus: normalizeStatusLabel(item?.followup_status),
+  salesStage: item?.sales_stage || '',
+  probability: Number(item?.probability_pct || 0),
+  quotationNo: item?.quotation_no || '',
+  quotationValue: Number(item?.quotation_value_ugx || 0),
+  sampleStatus: item?.sample_trial_status || 'Not Started',
+  actualOrderValue: Number(item?.actual_order_value_ugx || 0),
+  reasonLost: item?.reason_lost || '',
+  remarks: item?.remarks_management_notes || '',
+  competitor: item?.competitor_won_by || '',
+  stageLastUpdated: item?.stage_last_updated || '',
+  correctiveAction: item?.corrective_action || ''
+});
+
+const normalizeActivityApiPayload = (form, salespersonMap = []) => {
+  const salespersonId = salespersonMap.find(person => person.name === form.salesperson)?.id ?? form.salesperson;
+
+  return {
+    salesperson: salespersonId,
+    date: form.date || '',
+    area_route_visited: form.areaRoute || '',
+    customer_company: form.customer || '',
+    specific_location: form.specificLocation || '',
+    prospect_status: form.prospectStatus || '',
+    contact_person: form.contactPerson || '',
+    telephone: form.telephone || '',
+    product_service: form.product || '',
+    activity_type: form.activityType || '',
+    requirement_estimated_volume: form.reqEstVolume || '',
+    discussion_outcome: form.discussionOutcome || '',
+    next_action: form.nextAction || '',
+    next_followup_date: form.nextFollowUpDate || '',
+    quotation_submitted_value_ugx: Number(form.quotationSubmittedValue || 0),
+    order_received_value_ugx: Number(form.orderReceivedValue || 0),
+    cash_collected_ugx: Number(form.cashCollected || 0),
+    market_competitor_intelligence: form.marketIntel || '',
+    management_support_needed: form.mgmtSupportNeeded || '',
+    responsible_person_dept: form.respDept || '',
+    required_by_date: form.requiredByDate || '',
+    issue_status: form.issueStatus || ''
+  };
+};
+
+const normalizeActivityRecord = (item, fallbackId) => ({
+  id: item?.id ?? fallbackId,
+  date: item?.date || '',
+  salesperson: item?.salesperson_detail?.name || item?.salesperson || '',
+  areaRoute: item?.area_route_visited || '',
+  customer: item?.customer_company || '',
+  specificLocation: item?.specific_location || '',
+  prospectStatus: item?.prospect_status || '',
+  contactPerson: item?.contact_person || '',
+  telephone: item?.telephone || '',
+  product: item?.product_service || '',
+  activityType: item?.activity_type || '',
+  reqEstVolume: item?.requirement_estimated_volume || '',
+  discussionOutcome: item?.discussion_outcome || '',
+  nextAction: item?.next_action || '',
+  nextFollowUpDate: item?.next_followup_date || '',
+  quotationSubmittedValue: Number(item?.quotation_submitted_value_ugx || 0),
+  orderReceivedValue: Number(item?.order_received_value_ugx || 0),
+  cashCollected: Number(item?.cash_collected_ugx || 0),
+  marketIntel: item?.market_competitor_intelligence || '',
+  mgmtSupportNeeded: item?.management_support_needed || '',
+  respDept: item?.responsible_person_dept || '',
+  requiredByDate: item?.required_by_date || '',
+  issueStatus: normalizeStatusLabel(item?.issue_status)
+});
 
 // Initial Customer Pipeline Dataset (29 fields compliant)
 const INITIAL_PIPELINE = [
@@ -267,6 +427,17 @@ export default function App({ onLogout }) {
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
   const [salespersonData, setSalespersonData] = useState([]);
+  const [salespersonForm, setSalespersonForm] = useState({
+    id: '',
+    name: '',
+    email: '',
+    phone: '',
+    department: 'Sales',
+    is_active: true
+  });
+  const [isSalespersonModalOpen, setIsSalespersonModalOpen] = useState(false);
+  const [isSalespersonDetailModalOpen, setIsSalespersonDetailModalOpen] = useState(false);
+  const [selectedSalespersonItem, setSelectedSalespersonItem] = useState(null);
   const [salesStages, setSalesStages] = useState(INITIAL_SALES_STAGES);
   const [customerTypes, setCustomerTypes] = useState(INITIAL_CUSTOMER_TYPES);
   const [departments, setDepartments] = useState(INITIAL_DEPTS);
@@ -295,6 +466,7 @@ export default function App({ onLogout }) {
   // New item form template
   const emptyPipelineForm = {
     id: '',
+    prospectId: '',
     dateAdded: new Date().toISOString().split('T')[0],
     salesperson: salespersons[0],
     customer: '',
@@ -373,7 +545,8 @@ export default function App({ onLogout }) {
     })
     .then(data => {
       const formattedData = data.map(item => ({
-        id: item.prospect_id,
+        id: item.id,
+        prospectId: item.prospect_id,
         dateAdded: item.date_added,
         salesperson: item.salesperson_detail?.name || '',
         customer: item.customer_company,
@@ -412,7 +585,7 @@ export default function App({ onLogout }) {
 }, []);
 // Daily Activity API
 useEffect(() => {
-  fetch('https://api.navapacksolutions.com/api/daily-activities/')
+  fetch(ACTIVITY_API_URL)
     .then(response => {
       if (!response.ok) {
         throw new Error('Failed to fetch daily activities');
@@ -420,32 +593,7 @@ useEffect(() => {
       return response.json();
     })
     .then(data => {
-      const formattedData = data.map(item => ({
-        id: item.id,
-        date: item.date,
-        salesperson: item.salesperson_detail?.name || '',
-        areaRoute: item.area_route_visited || '',
-        customer: item.customer_company || '',
-        specificLocation: item.specific_location || '',
-        prospectStatus: item.prospect_status || '',
-        contactPerson: item.contact_person || '',
-        telephone: item.telephone || '',
-        product: item.product_service || '',
-        activityType: item.activity_type || '',
-        reqEstVolume: item.requirement_estimated_volume || '',
-        discussionOutcome: item.discussion_outcome || '',
-        nextAction: item.next_action || '',
-        nextFollowUpDate: item.next_followup_date || '',
-        quotationSubmittedValue: Number(item.quotation_submitted_value_ugx) || 0,
-        orderReceivedValue: Number(item.order_received_value_ugx) || 0,
-        cashCollected: Number(item.cash_collected_ugx) || 0,
-        marketIntel: item.market_competitor_intelligence || '',
-        mgmtSupportNeeded: item.management_support_needed || '',
-        respDept: item.responsible_person_dept || '',
-        requiredByDate: item.required_by_date || '',
-        issueStatus: item.issue_status || ''
-      }));
-
+      const formattedData = data.map(item => normalizeActivityRecord(item, item.id));
       setActivityData(formattedData);
     })
     .catch(error => {
@@ -507,18 +655,43 @@ useEffect(() => {
     };
   }, [pipelineData, activityData]);
 
-  const handleSavePipeline = (e) => {
+  const handleSavePipeline = async (e) => {
     e.preventDefault();
-    if (pipelineForm.id) {
-      setPipelineData(prev => prev.map(item => item.id === pipelineForm.id ? pipelineForm : item));
-    } else {
-      const newItem = {
-        ...pipelineForm,
-        id: `PR-${String(pipelineData.length + 1).padStart(3, '0')}`
-      };
-      setPipelineData(prev => [newItem, ...prev]);
+
+    const payload = normalizePipelineApiPayload(pipelineForm, salespersonData);
+    const apiUrl = pipelineForm.id ? `${PIPELINE_API_URL}${pipelineForm.id}/` : PIPELINE_API_URL;
+    const method = pipelineForm.id ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(apiUrl, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save pipeline record (${response.status}): ${errorText}`);
+      }
+
+      const savedRecord = await response.json();
+      const normalizedRecord = normalizePipelineRecord(savedRecord, pipelineForm.id || `PR-${String(pipelineData.length + 1).padStart(3, '0')}`);
+
+      setPipelineData(prev => {
+        if (pipelineForm.id) {
+          return prev.map(item => item.id === pipelineForm.id ? normalizedRecord : item);
+        }
+        return [normalizedRecord, ...prev];
+      });
+
+      setPipelineForm(emptyPipelineForm);
+      setIsPipelineModalOpen(false);
+    } catch (error) {
+      console.error('Error saving pipeline record:', error);
+      alert('Unable to save the customer pipeline record. Please try again.');
     }
-    setIsPipelineModalOpen(false);
   };
 
   const handleEditPipeline = (item) => {
@@ -526,24 +699,64 @@ useEffect(() => {
     setIsPipelineModalOpen(true);
   };
 
-  const handleDeletePipeline = (id) => {
-    if (window.confirm('Are you sure you want to delete this customer prospect record?')) {
+  const handleDeletePipeline = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this customer prospect record?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${PIPELINE_API_URL}${id}/`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete pipeline record (${response.status})`);
+      }
+
       setPipelineData(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Error deleting pipeline record:', error);
+      alert('Unable to delete the customer pipeline record. Please try again.');
     }
   };
 
-  const handleSaveActivity = (e) => {
+  const handleSaveActivity = async (e) => {
     e.preventDefault();
-    if (activityForm.id) {
-      setActivityData(prev => prev.map(item => item.id === activityForm.id ? activityForm : item));
-    } else {
-      const newItem = {
-        ...activityForm,
-        id: `ACT-${String(activityData.length + 101)}`
-      };
-      setActivityData(prev => [newItem, ...prev]);
+
+    const payload = normalizeActivityApiPayload(activityForm, salespersonData);
+    const apiUrl = activityForm.id ? `${ACTIVITY_API_URL}${activityForm.id}/` : ACTIVITY_API_URL;
+    const method = activityForm.id ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(apiUrl, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save daily activity (${response.status}): ${errorText}`);
+      }
+
+      const savedRecord = await response.json();
+      const normalizedRecord = normalizeActivityRecord(savedRecord, activityForm.id || `ACT-${String(activityData.length + 101)}`);
+
+      setActivityData(prev => {
+        if (activityForm.id) {
+          return prev.map(item => item.id === activityForm.id ? normalizedRecord : item);
+        }
+        return [normalizedRecord, ...prev];
+      });
+
+      setActivityForm(emptyActivityForm);
+      setIsActivityModalOpen(false);
+    } catch (error) {
+      console.error('Error saving daily activity:', error);
+      alert('Unable to save the daily activity record. Please try again.');
     }
-    setIsActivityModalOpen(false);
   };
 
   const handleEditActivity = (item) => {
@@ -551,9 +764,108 @@ useEffect(() => {
     setIsActivityModalOpen(true);
   };
 
-  const handleDeleteActivity = (id) => {
-    if (window.confirm('Are you sure you want to delete this activity log?')) {
+  const handleDeleteActivity = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this activity log?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${ACTIVITY_API_URL}${id}/`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete daily activity (${response.status})`);
+      }
+
       setActivityData(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Error deleting daily activity:', error);
+      alert('Unable to delete the daily activity record. Please try again.');
+    }
+  };
+
+  const handleSaveSalesperson = async (e) => {
+    e.preventDefault();
+
+    const payload = normalizeSalespersonApiPayload(salespersonForm);
+    const apiUrl = salespersonForm.id ? `${SALESPERSON_API_URL}${salespersonForm.id}/` : SALESPERSON_API_URL;
+    const method = salespersonForm.id ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(apiUrl, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save salesperson (${response.status}): ${errorText}`);
+      }
+
+      const savedRecord = await response.json();
+      const normalizedRecord = normalizeSalespersonRecord(savedRecord, salespersonForm.id || savedRecord.id);
+
+      setSalespersonData(prev => {
+        if (salespersonForm.id) {
+          return prev.map(item => item.id === salespersonForm.id ? normalizedRecord : item);
+        }
+        return [normalizedRecord, ...prev];
+      });
+
+      setSalespersonForm({
+        id: '',
+        name: '',
+        email: '',
+        phone: '',
+        department: 'Sales',
+        is_active: true
+      });
+      setIsSalespersonModalOpen(false);
+    } catch (error) {
+      console.error('Error saving salesperson:', error);
+      alert('Unable to save the salesperson record. Please try again.');
+    }
+  };
+
+  const handleEditSalesperson = (person) => {
+    setSalespersonForm({
+      id: person.id,
+      name: person.name || '',
+      email: person.email || '',
+      phone: person.phone || '',
+      department: person.department || 'Sales',
+      is_active: Boolean(person.is_active)
+    });
+    setIsSalespersonModalOpen(true);
+  };
+
+  const handleViewSalesperson = (person) => {
+    setSelectedSalespersonItem(person);
+    setIsSalespersonDetailModalOpen(true);
+  };
+
+  const handleDeleteSalesperson = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this salesperson?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${SALESPERSON_API_URL}${id}/`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete salesperson (${response.status})`);
+      }
+
+      setSalespersonData(prev => prev.filter(person => person.id !== id));
+    } catch (error) {
+      console.error('Error deleting salesperson:', error);
+      alert('Unable to delete the salesperson record. Please try again.');
     }
   };
 
@@ -913,6 +1225,7 @@ useEffect(() => {
                       <tr>
                         <th className="p-2 border-r border-slate-200 sticky left-0 bg-slate-100">Actions</th>
                         <th className="p-2 border-r border-slate-200">Prospect ID</th>
+                        <th className="p-2 border-r border-slate-200">Record ID</th>
                         <th className="p-2 border-r border-slate-200">Date Added</th>
                         <th className="p-2 border-r border-slate-200">Salesperson</th>
                         <th className="p-2 border-r border-slate-200">Customer / Company</th>
@@ -972,7 +1285,8 @@ useEffect(() => {
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
-                          <td className="p-2 border-r border-slate-200 font-mono font-medium text-slate-900">{item.id}</td>
+                          <td className="p-2 border-r border-slate-200 font-mono font-medium text-sky-900">{item.prospectId || item.id}</td>
+                          <td className="p-2 border-r border-slate-200 font-mono text-slate-500">{item.id}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-600">{item.dateAdded}</td>
                           <td className="p-2 border-r border-slate-200 font-medium text-slate-800">{item.salesperson}</td>
                           <td className="p-2 border-r border-slate-200 font-semibold text-sky-900">{item.customer}</td>
@@ -1036,6 +1350,26 @@ useEffect(() => {
                 <p className="text-xs text-slate-500 mt-1">
                   Salesperson information from the backend database
                 </p>
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSalespersonForm({
+                        id: '',
+                        name: '',
+                        email: '',
+                        phone: '',
+                        department: 'Sales',
+                        is_active: true
+                      });
+                      setIsSalespersonModalOpen(true);
+                    }}
+                    className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Salesperson</span>
+                  </button>
+                </div>
               </div>
 
               {/* Salesperson Table */}
@@ -1056,6 +1390,7 @@ useEffect(() => {
 
                     <thead className="bg-slate-100 text-slate-700 border-b border-slate-200 font-bold">
                       <tr>
+                        <th className="p-3 border-r border-slate-200">Actions</th>
                         <th className="p-3 border-r border-slate-200">
                           Name
                         </th>
@@ -1080,6 +1415,34 @@ useEffect(() => {
                           key={person.id}
                           className="hover:bg-slate-50 transition-colors"
                         >
+                          <td className="p-3 border-r border-slate-200">
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleViewSalesperson(person)}
+                                className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-sky-600"
+                                title="View salesperson"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleEditSalesperson(person)}
+                                className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-amber-600"
+                                title="Edit salesperson"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSalesperson(person.id)}
+                                className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-red-600"
+                                title="Delete salesperson"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
                           <td className="p-3 border-r border-slate-200 font-medium text-slate-800">
                             {person.name}
                           </td>
@@ -1810,7 +2173,7 @@ useEffect(() => {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="p-4 bg-sky-800 text-white flex justify-between items-center">
               <h3 className="font-bold text-base">
-                {pipelineForm.id ? `Edit Customer Prospect: ${pipelineForm.id}` : 'Add New Customer Prospect'}
+                {pipelineForm.id ? `Edit Customer Prospect: ${pipelineForm.prospectId || pipelineForm.id}` : 'Add New Customer Prospect'}
               </h3>
               <button onClick={() => setIsPipelineModalOpen(false)} className="hover:bg-sky-700 p-1 rounded">
                 <XCircle className="w-5 h-5" />
@@ -2062,6 +2425,19 @@ useEffect(() => {
                 </div>
 
                 <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Issue Status</label>
+                  <select
+                    value={activityForm.issueStatus}
+                    onChange={(e) => setActivityForm({ ...activityForm, issueStatus: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  >
+                    {issueStatuses.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">Cash Collected (UGX)</label>
                   <input
                     type="number"
@@ -2112,6 +2488,146 @@ useEffect(() => {
         </div>
       )}
 
+      {isSalespersonModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="p-4 bg-sky-800 text-white flex justify-between items-center">
+              <h3 className="font-bold text-base">
+                {salespersonForm.id ? `Edit Salesperson: ${salespersonForm.name}` : 'Add New Salesperson'}
+              </h3>
+              <button onClick={() => setIsSalespersonModalOpen(false)} className="hover:bg-sky-700 p-1 rounded">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSalesperson} className="p-6 overflow-y-auto space-y-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">Name *</label>
+                  <input
+                    type="text"
+                    value={salespersonForm.name}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, name: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2 focus:ring-2 focus:ring-sky-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={salespersonForm.email}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, email: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Phone</label>
+                  <input
+                    type="text"
+                    value={salespersonForm.phone}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, phone: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
+                  <select
+                    value={salespersonForm.department}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, department: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  >
+                    {departments.map(dep => <option key={dep} value={dep}>{dep}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Active</label>
+                  <select
+                    value={salespersonForm.is_active ? 'true' : 'false'}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, is_active: e.target.value === 'true' })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  >
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsSalespersonModalOpen(false)}
+                  className="px-4 py-2 border border-slate-300 rounded text-slate-600 font-medium hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-sky-600 text-white rounded font-medium hover:bg-sky-700"
+                >
+                  Save Salesperson
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isSalespersonDetailModalOpen && selectedSalespersonItem && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden text-xs">
+            <div className="p-4 bg-sky-900 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-sm">{selectedSalespersonItem.name}</h3>
+                <p className="text-[11px] text-sky-200">Salesperson ID: {selectedSalespersonItem.id}</p>
+              </div>
+              <button onClick={() => setIsSalespersonDetailModalOpen(false)} className="hover:bg-sky-800 p-1 rounded">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <span className="text-slate-400">Email:</span>
+                  <p className="font-semibold text-slate-800">{selectedSalespersonItem.email || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Phone:</span>
+                  <p className="font-semibold text-slate-800">{selectedSalespersonItem.phone || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Department:</span>
+                  <p className="font-semibold text-slate-800">{selectedSalespersonItem.department || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Status:</span>
+                  <p className="font-semibold text-slate-800">{selectedSalespersonItem.is_active ? 'Active' : 'Inactive'}</p>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-slate-400">Created At:</span>
+                <p className="font-semibold text-slate-800">{selectedSalespersonItem.created_at ? new Date(selectedSalespersonItem.created_at).toLocaleString() : 'N/A'}</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setIsSalespersonDetailModalOpen(false)}
+                className="px-4 py-1.5 bg-slate-800 text-white rounded font-medium hover:bg-slate-900"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* DETAIL EYE MODAL FOR PIPELINE */}
       {isDetailModalOpen && selectedPipelineItem && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2119,7 +2635,7 @@ useEffect(() => {
             <div className="p-4 bg-sky-900 text-white flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-sm">{selectedPipelineItem.customer}</h3>
-                <p className="text-[11px] text-sky-200">ID: {selectedPipelineItem.id} | Rep: {selectedPipelineItem.salesperson}</p>
+                <p className="text-[11px] text-sky-200">Prospect ID: {selectedPipelineItem.prospectId || selectedPipelineItem.id} | Record ID: {selectedPipelineItem.id} | Rep: {selectedPipelineItem.salesperson}</p>
               </div>
               <button onClick={() => setIsDetailModalOpen(false)} className="hover:bg-sky-800 p-1 rounded">
                 <XCircle className="w-5 h-5" />

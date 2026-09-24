@@ -18,7 +18,7 @@ interface LoginScreenProps {
   onNavigateToSignup?: () => void;
 }
 
-const USERS_API_URL = 'https://api.navapacksolutions.com/api/users/';
+const SALESPERSONS_API_URL = 'https://api.navapacksolutions.com/api/salespersons/';
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToSignup }) => {
   const [email, setEmail] = useState('');
@@ -69,20 +69,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
         localStorage.setItem('token', result.token);
       }
 
-      const usersResponse = await fetch(USERS_API_URL, {
+      const salespersonsResponse = await fetch(SALESPERSONS_API_URL, {
         headers: result.token
           ? { Authorization: `Bearer ${result.token}` }
           : undefined,
       });
-      const usersPayload = await usersResponse.json();
-      const users = Array.isArray(usersPayload)
-        ? usersPayload
-        : usersPayload.results || [];
-      const loggedInUser = users.find(
-        (user: User) => user.email?.toLowerCase() === email.toLowerCase(),
+      const salespersonsPayload = await salespersonsResponse.json();
+      const salespersons = Array.isArray(salespersonsPayload)
+        ? salespersonsPayload
+        : salespersonsPayload.results || [];
+      const loggedInSalesperson = salespersons.find(
+        (salesperson: User) => salesperson.email?.toLowerCase() === email.toLowerCase(),
       );
 
-      onLogin({ ...(result.user || {}), ...(loggedInUser || {}), email });
+      onLogin({ ...(result.user || {}), ...(loggedInSalesperson || {}), email });
     } catch (err) {
       setError('Something went wrong. Please check your backend connection.');
     } finally {
