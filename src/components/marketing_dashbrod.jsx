@@ -22,6 +22,7 @@ const PIPELINE_API_URL = 'https://api.navapacksolutions.com/api/pipeline/';
 const ACTIVITY_API_URL = 'https://api.navapacksolutions.com/api/daily-activities/';
 const SALESPERSON_API_URL = 'https://api.navapacksolutions.com/api/salespersons/';
 const DASHBOARD_METRICS_API_URL = 'https://api.navapacksolutions.com/api/dashboard-metrics/';
+const REPORTS_API_URL = 'https://api.navapacksolutions.com/api/reports/';
 
 const normalizeSalespersonApiPayload = (form) => ({
   name: form.name || '',
@@ -452,7 +453,7 @@ const formatUGX = (amount) => {
   return 'UGX ' + Number(amount).toLocaleString('en-US');
 };
 
-export default function App({ onLogout, department = 'marketing' }) {
+export default function App({ onLogout, department = 'marketing', user = {} }) {
   const isSalesUser = department.trim().toLowerCase() === 'sales';
   const [activeTab, setActiveTab] = useState(isSalesUser ? 'pipeline' : 'dashboard');
   const [pipelineData, setPipelineData] = useState([]);
@@ -478,6 +479,12 @@ export default function App({ onLogout, department = 'marketing' }) {
   const salespersons = salespersonData.length > 0
   ? salespersonData.map(person => person.name)
   : INITIAL_SALESPERSONS;
+  const loggedInSalesperson = salespersonData.find(person => {
+    const userEmail = user.email?.trim().toLowerCase();
+    const userName = user.name?.trim().toLowerCase();
+    return (userEmail && person.email?.trim().toLowerCase() === userEmail)
+      || (userName && person.name?.trim().toLowerCase() === userName);
+  })?.name || user.name || salespersons[0];
 
   // Search & Filter States
   const [pipelineSearch, setPipelineSearch] = useState('');
@@ -485,8 +492,11 @@ export default function App({ onLogout, department = 'marketing' }) {
   const [activitySearch, setActivitySearch] = useState('');
   
   // Weekly Report Date Range
-  const [weeklyStartDate, setWeeklyStartDate] = useState('2026-09-07');
-  const [weeklyEndDate, setWeeklyEndDate] = useState('2026-09-12');
+  const [weeklyStartDate, setWeeklyStartDate] = useState('2026-09-21');
+  const [weeklyEndDate, setWeeklyEndDate] = useState('2026-09-26');
+  const [weeklyReport, setWeeklyReport] = useState(null);
+  const [weeklyReportLoading, setWeeklyReportLoading] = useState(false);
+  const [weeklyReportError, setWeeklyReportError] = useState('');
 
   // Modal Controls
   const [isPipelineModalOpen, setIsPipelineModalOpen] = useState(false);
@@ -501,7 +511,7 @@ export default function App({ onLogout, department = 'marketing' }) {
     id: '',
     prospectId: '',
     dateAdded: new Date().toISOString().split('T')[0],
-    salesperson: salespersons[0],
+    salesperson: loggedInSalesperson,
     customer: '',
     location: '',
     contactPerson: '',
@@ -535,7 +545,7 @@ export default function App({ onLogout, department = 'marketing' }) {
   const emptyActivityForm = {
     id: '',
     date: new Date().toISOString().split('T')[0],
-    salesperson: salespersons[0],
+    salesperson: loggedInSalesperson,
     areaRoute: '',
     customer: '',
     specificLocation: '',
@@ -669,6 +679,32 @@ useEffect(() => {
       setDashboardMetricsError('Live dashboard metrics are unavailable. Showing local data.');
     });
 }, []);
+
+useEffect(() => {
+  const controller = new AbortController();
+
+  setWeeklyReportLoading(true);
+  setWeeklyReportError('');
+  fetch(`${REPORTS_API_URL}?period=weekly&start_date=${weeklyStartDate}&end_date=${weeklyEndDate}`, {
+    signal: controller.signal
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed to fetch weekly report (${response.status})`);
+      }
+      return response.json();
+    })
+    .then(data => setWeeklyReport(data))
+    .catch(error => {
+      if (error.name !== 'AbortError') {
+        console.error('Error fetching weekly report:', error);
+        setWeeklyReportError('Live report data is unavailable. Showing the local report below.');
+      }
+    })
+    .finally(() => setWeeklyReportLoading(false));
+
+  return () => controller.abort();
+}, [weeklyStartDate, weeklyEndDate]);
 
 
 
@@ -1033,7 +1069,7 @@ useEffect(() => {
               }`}
             >
               <FileText className="w-4 h-4" />
-              <span>Weekly Report</span>
+              <span>Reports</span>
             </button>
             )}
 
@@ -1282,7 +1318,6 @@ useEffect(() => {
                 </div>
 
                 <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
-                  {!isSalesUser && (
                   <button
                     onClick={() => {
                       setPipelineForm(emptyPipelineForm);
@@ -1293,7 +1328,6 @@ useEffect(() => {
                     <Plus className="w-4 h-4" />
                     <span>Add New Prospect</span>
                   </button>
-                  )}
                 </div>
               </div>
 
@@ -1362,7 +1396,6 @@ useEffect(() => {
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            {!isSalesUser && (
                             <button
                               onClick={() => handleDeletePipeline(item.id)}
                               className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-red-600"
@@ -1370,7 +1403,6 @@ useEffect(() => {
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                            )}
                           </td>
                           <td className="p-2 border-r border-slate-200 font-mono font-medium text-sky-900">{item.prospectId || item.id}</td>
                           <td className="p-2 border-r border-slate-200 font-mono text-slate-500">{item.id}</td>
@@ -1589,7 +1621,6 @@ useEffect(() => {
                   />
                 </div>
 
-                {!isSalesUser && (
                 <button
                   onClick={() => {
                     setActivityForm(emptyActivityForm);
@@ -1600,7 +1631,6 @@ useEffect(() => {
                   <Plus className="w-4 h-4" />
                   <span>Log New Daily Activity</span>
                 </button>
-                )}
               </div>
 
               {/* Data Table */}
@@ -1740,6 +1770,105 @@ useEffect(() => {
                   </div>
                 </div>
               </div>
+
+              {weeklyReportLoading && (
+                <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+                  Loading the live weekly report...
+                </div>
+              )}
+              {weeklyReportError && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  {weeklyReportError}
+                </div>
+              )}
+
+              {weeklyReport && (
+                <div className="space-y-8">
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-3 bg-sky-700 text-white font-bold text-sm uppercase tracking-wide flex justify-between">
+                      <span>LIVE API REPORT: SALES PERFORMANCE</span>
+                      <span className="text-xs font-normal text-sky-200">{weeklyReport.period || 'weekly'}</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="bg-slate-100 text-slate-800 font-bold">
+                          <tr>
+                            <th className="p-2.5 border-r border-slate-200">Metric</th>
+                            {(weeklyReport.sales_performance?.salespersons || []).map(rep => (
+                              <th key={rep} className="p-2.5 text-center border-r border-slate-200">{rep}</th>
+                            ))}
+                            <th className="p-2.5 text-center bg-slate-800 text-white">TOTAL TEAM</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {(weeklyReport.sales_performance?.rows || []).map(row => (
+                            <tr key={row.key}>
+                              <td className="p-2.5 border-r border-slate-200 font-medium">{row.metric}</td>
+                              {(weeklyReport.sales_performance?.salespersons || []).map(rep => {
+                                const value = row.per_salesperson?.[rep] || 0;
+                                return <td key={rep} className="p-2.5 text-center border-r border-slate-200">{row.is_currency ? formatUGX(value) : value}</td>;
+                              })}
+                              <td className="p-2.5 text-center bg-slate-100 font-bold">{row.is_currency ? formatUGX(row.total_team) : row.total_team}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="p-3 bg-cyan-800 text-white font-bold text-sm uppercase">TOP ACTIVE SALES OPPORTUNITIES</div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="bg-slate-100 font-bold"><tr><th className="p-2.5">Customer</th><th className="p-2.5">Salesperson</th><th className="p-2.5">Stage</th><th className="p-2.5 text-right">Value</th></tr></thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {(weeklyReport.top_opportunities || []).map(item => (
+                              <tr key={item.id}><td className="p-2.5 font-bold text-sky-900">{item.customer}</td><td className="p-2.5">{item.salesperson}</td><td className="p-2.5">{item.sales_stage}</td><td className="p-2.5 text-right font-semibold">{formatUGX(item.potential_value_ugx)}</td></tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="p-3 bg-amber-700 text-white font-bold text-sm uppercase">MARKET INTELLIGENCE</div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="bg-slate-100 font-bold"><tr><th className="p-2.5">Date</th><th className="p-2.5">Salesperson</th><th className="p-2.5">Customer</th><th className="p-2.5">Information</th></tr></thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {(weeklyReport.market_intelligence || []).map((item, index) => <tr key={item.id || index}><td className="p-2.5">{item.date}</td><td className="p-2.5">{item.salesperson}</td><td className="p-2.5 font-semibold">{item.customer || item.customer_company}</td><td className="p-2.5">{item.market_intelligence || item.market_competitor_intelligence || item.information}</td></tr>)}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="p-3 bg-purple-800 text-white font-bold text-sm uppercase">MANAGEMENT DELAYS</div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="bg-slate-100 font-bold"><tr><th className="p-2.5">Customer</th><th className="p-2.5">Salesperson</th><th className="p-2.5">Support Needed</th><th className="p-2.5">Status</th></tr></thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {(weeklyReport.management_delays || []).map((item, index) => <tr key={item.id || index}><td className="p-2.5 font-semibold">{item.customer || item.customer_company}</td><td className="p-2.5">{item.salesperson}</td><td className="p-2.5">{item.management_support_needed || item.support_needed}</td><td className="p-2.5">{item.issue_status || item.status}</td></tr>)}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="p-3 bg-rose-800 text-white font-bold text-sm uppercase">ORDERS LOST</div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="bg-slate-100 font-bold"><tr><th className="p-2.5">Customer</th><th className="p-2.5">Salesperson</th><th className="p-2.5">Reason</th><th className="p-2.5">Value</th></tr></thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {(weeklyReport.orders_lost || []).map((item, index) => <tr key={item.id || index}><td className="p-2.5 font-semibold">{item.customer || item.customer_company}</td><td className="p-2.5">{item.salesperson}</td><td className="p-2.5">{item.reason_lost || item.reason}</td><td className="p-2.5">{formatUGX(item.potential_value_ugx || item.value_ugx)}</td></tr>)}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Section 1: WEEKLY SALES PERFORMANCE REPORT (Matrix) */}
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

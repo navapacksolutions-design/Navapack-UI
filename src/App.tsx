@@ -49,6 +49,16 @@ export default function App() {
     useState<ScreenId>(getScreenFromPath);
   const [loggedInDepartment, setLoggedInDepartment] =
     useState<string>(() => sessionStorage.getItem('navapack_department') || '');
+  const [loggedInUser, setLoggedInUser] = useState<{
+    name?: string;
+    email?: string;
+  }>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('navapack_user') || '{}');
+    } catch {
+      return {};
+    }
+  });
 
   const [transition, setTransition] =
     useState<TransitionType>('push');
@@ -304,8 +314,14 @@ export default function App() {
               <LoginScreen
                 onLogin={(user) => {
                   const department = user.department?.trim().toLowerCase();
+                  const userIdentity = {
+                    name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+                    email: user.email,
+                  };
+                  setLoggedInUser(userIdentity);
                   setLoggedInDepartment(department || '');
                   sessionStorage.setItem('navapack_department', department || '');
+                  sessionStorage.setItem('navapack_user', JSON.stringify(userIdentity));
                   handleNavigate(
                     department === 'sales' || department === 'marketing'
                       ? 'marketing-dashboard'
@@ -371,10 +387,13 @@ export default function App() {
             {currentScreen === 'marketing-dashboard' && (
               <MarketingDashboard
                 department={loggedInDepartment}
+                user={loggedInUser}
                 onLogout={() =>
                   {
                     setLoggedInDepartment('');
+                    setLoggedInUser({});
                     sessionStorage.removeItem('navapack_department');
+                    sessionStorage.removeItem('navapack_user');
                     handleNavigate(
                       'login',
                       'push_back'
