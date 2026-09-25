@@ -9,7 +9,7 @@ interface User {
   name?: string;
   first_name?: string;
   last_name?: string;
-  employeeId?: string
+  employeeId?: string;
   department?: string;
 }
 
@@ -18,7 +18,10 @@ interface LoginScreenProps {
   onNavigateToSignup?: () => void;
 }
 
-const SALESPERSONS_API_URL = 'https://api.navapacksolutions.com/api/salespersons/';
+// Change this if your frontend isn't running against a local backend.
+const API_BASE_URL = 'https://api.navapacksolutions.com/api';
+const LOGIN_API_URL = `${API_BASE_URL}/login/`;
+const SALESPERSONS_API_URL = `${API_BASE_URL}/salespersons/`;
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToSignup }) => {
   const [email, setEmail] = useState('');
@@ -45,7 +48,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
     }
 
     try {
-      const response = await fetch('https://api.navapacksolutions.com/api/login/', {
+      const response = await fetch(LOGIN_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -53,7 +56,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
         body: JSON.stringify({ email, password }),
       });
 
-      const result = await response.json();
+      let result: any = {};
+      try {
+        result = await response.json();
+      } catch {
+        // Non-JSON response (e.g. HTML error page from a proxy/server error)
+        result = {};
+      }
 
       if (!response.ok) {
         const errorMessage =
@@ -61,30 +70,43 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
           result.detail ||
           result.email?.[0] ||
           result.password?.[0] ||
-          'Unable to sign in with provided credentials.';
+          `Unable to sign in (status ${response.status}). Please check your credentials.`;
 
         setError(errorMessage);
         return;
       }
 
-      if (result.token) {
-        localStorage.setItem('token', result.token);
+      // Base user info from the login response — login succeeds even if the
+      // salesperson lookup below fails for any reason.
+      let mergedUser: User = { ...(result.user || {}), email };
+
+      try {
+        const salespersonsResponse = await fetch(SALESPERSONS_API_URL);
+
+        if (salespersonsResponse.ok) {
+          const salespersonsPayload = await salespersonsResponse.json();
+          const salespersons = Array.isArray(salespersonsPayload)
+            ? salespersonsPayload
+            : salespersonsPayload.results || [];
+          const loggedInSalesperson = salespersons.find(
+            (salesperson: User) =>
+              salesperson.email?.trim().toLowerCase() === normalizedEmail,
+          );
+
+          if (loggedInSalesperson) {
+            mergedUser = { ...mergedUser, ...loggedInSalesperson, email };
+          }
+        } else {
+          console.warn(
+            `Salesperson lookup failed with status ${salespersonsResponse.status}; continuing with base user info.`,
+          );
+        }
+      } catch (lookupErr) {
+        // Don't block login if this secondary call fails.
+        console.warn('Salesperson lookup failed:', lookupErr);
       }
 
-      const salespersonsResponse = await fetch(SALESPERSONS_API_URL, {
-        headers: result.token
-          ? { Authorization: `Bearer ${result.token}` }
-          : undefined,
-      });
-      const salespersonsPayload = await salespersonsResponse.json();
-      const salespersons = Array.isArray(salespersonsPayload)
-        ? salespersonsPayload
-        : salespersonsPayload.results || [];
-      const loggedInSalesperson = salespersons.find(
-        (salesperson: User) => salesperson.email?.trim().toLowerCase() === normalizedEmail,
-      );
-
-      onLogin({ ...(result.user || {}), ...(loggedInSalesperson || {}), email });
+      onLogin(mergedUser);
     } catch (err) {
       setError('Something went wrong. Please check your backend connection.');
     } finally {
@@ -100,13 +122,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
 
       {/* Main Glassmorphism Card */}
       <div className="w-full max-w-md bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 sm:p-10 shadow-2xl relative z-10 text-white">
-        
+
         {/* Logo Container */}
         <div className="text-center mb-8">
           <div className="inline-block bg-white/95 backdrop-blur-md px-6 py-3.5 rounded-2xl shadow-lg border border-white/40 mb-3">
-            <img 
-              src={logo} 
-              alt="NavaPack Logo" 
+            <img
+              src={logo}
+              alt="NavaPack Logo"
               className="h-10 w-auto object-contain mx-auto"
             />
           </div>
@@ -193,7 +215,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
           <p className="text-[11px] text-slate-400">
             Protected area • Internal system authorization required
           </p>
-          
+
           {/* Sign Up Link */}
           <p className="text-[11px] text-slate-400 mt-4">
             Don't have an account?{' '}
