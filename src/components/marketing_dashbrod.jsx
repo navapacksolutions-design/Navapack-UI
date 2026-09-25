@@ -539,6 +539,9 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     if (form.cashCollected !== '' && form.cashCollected !== null && Number(form.cashCollected) < 0) {
       errors.cashCollected = 'Cash collected cannot be negative.';
     }
+    if (form.orderReceivedValue !== '' && form.orderReceivedValue !== null && Number(form.orderReceivedValue) < 0) {
+      errors.orderReceivedValue = 'Order received value cannot be negative.';
+    }
     return errors;
   };
 
@@ -1124,7 +1127,11 @@ useEffect(() => {
       
       const matchesStage = pipelineStageFilter === 'ALL' || item.salesStage === pipelineStageFilter;
       return matchesSearch && matchesStage;
-    });
+    }).sort((first, second) => String(first.prospectId || first.id).localeCompare(
+      String(second.prospectId || second.id),
+      undefined,
+      { numeric: true, sensitivity: 'base' }
+    ));
   }, [pipelineData, pipelineSearch, pipelineStageFilter]);
 
   const filteredActivities = useMemo(() => {
@@ -1135,7 +1142,11 @@ useEffect(() => {
         item.areaRoute.toLowerCase().includes(activitySearch.toLowerCase()) ||
         item.product.toLowerCase().includes(activitySearch.toLowerCase())
       );
-    });
+    }).sort((first, second) => String(first.id).localeCompare(
+      String(second.id),
+      undefined,
+      { numeric: true, sensitivity: 'base' }
+    ));
   }, [activityData, activitySearch]);
 
   return (
@@ -1502,8 +1513,8 @@ useEffect(() => {
                     <thead className="bg-slate-100 text-slate-700 sticky top-0 border-b border-slate-200 font-bold z-10">
                       <tr>
                         <th className="p-2 border-r border-slate-200 sticky left-0 bg-slate-100">Actions</th>
-                        <th className="p-2 border-r border-slate-200">Prospect ID</th>
                         <th className="p-2 border-r border-slate-200">Record ID</th>
+                        <th className="p-2 border-r border-slate-200">Prospect ID</th>
                         <th className="p-2 border-r border-slate-200">Date Added</th>
                         <th className="p-2 border-r border-slate-200">Salesperson</th>
                         <th className="p-2 border-r border-slate-200">Customer / Company</th>
@@ -1563,8 +1574,8 @@ useEffect(() => {
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
-                          <td className="p-2 border-r border-slate-200 font-mono font-medium text-sky-900">{item.prospectId || item.id}</td>
                           <td className="p-2 border-r border-slate-200 font-mono text-slate-500">{item.id}</td>
+                          <td className="p-2 border-r border-slate-200 font-mono font-medium text-sky-900">{item.prospectId || item.id}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-600">{item.dateAdded}</td>
                           <td className="p-2 border-r border-slate-200 font-medium text-slate-800">{item.salesperson}</td>
                           <td className="p-2 border-r border-slate-200 font-semibold text-sky-900">{item.customer}</td>
@@ -2856,6 +2867,23 @@ useEffect(() => {
                       <option key={status} value={status}>{status}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Order Received Value (UGX)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={activityForm.orderReceivedValue}
+                    onChange={(e) => {
+                      setActivityForm({ ...activityForm, orderReceivedValue: Number(e.target.value) });
+                      if (activityFormErrors.orderReceivedValue) setActivityFormErrors({ ...activityFormErrors, orderReceivedValue: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(activityFormErrors.orderReceivedValue)}`}
+                  />
+                  {activityFormErrors.orderReceivedValue && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.orderReceivedValue}</p>
+                  )}
                 </div>
 
                 <div>
