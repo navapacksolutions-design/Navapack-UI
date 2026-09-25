@@ -484,6 +484,78 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const showErrorPopup = (error, fallbackMessage) => {
     setErrorPopup(error instanceof Error ? error.message : fallbackMessage);
   };
+
+  // Generic confirmation modal (replaces window.confirm)
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Delete',
+    onConfirm: null
+  });
+
+  const askConfirm = ({ title, message, confirmLabel = 'Delete', onConfirm }) => {
+    setConfirmDialog({ isOpen: true, title, message, confirmLabel, onConfirm });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ isOpen: false, title: '', message: '', confirmLabel: 'Delete', onConfirm: null });
+  };
+
+  const handleConfirmProceed = () => {
+    const action = confirmDialog.onConfirm;
+    closeConfirmDialog();
+    if (typeof action === 'function') {
+      action();
+    }
+  };
+
+  // Field-level validation error state per form
+  const [pipelineFormErrors, setPipelineFormErrors] = useState({});
+  const [activityFormErrors, setActivityFormErrors] = useState({});
+  const [salespersonFormErrors, setSalespersonFormErrors] = useState({});
+
+  const PHONE_REGEX = /^[+]?[\d\s-]{7,20}$/;
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validatePipelineForm = (form) => {
+    const errors = {};
+    if (!form.salesperson || !form.salesperson.trim()) errors.salesperson = 'Salesperson is required.';
+    if (!form.customer || !form.customer.trim()) errors.customer = 'Customer / Company is required.';
+    if (form.telephone && !PHONE_REGEX.test(form.telephone.trim())) {
+      errors.telephone = 'Enter a valid phone number.';
+    }
+    if (form.estValue !== '' && form.estValue !== null && Number(form.estValue) < 0) {
+      errors.estValue = 'Estimated value cannot be negative.';
+    }
+    return errors;
+  };
+
+  const validateActivityForm = (form) => {
+    const errors = {};
+    if (!form.date) errors.date = 'Date is required.';
+    if (!form.salesperson || !form.salesperson.trim()) errors.salesperson = 'Salesperson is required.';
+    if (!form.customer || !form.customer.trim()) errors.customer = 'Customer / Company is required.';
+    if (form.cashCollected !== '' && form.cashCollected !== null && Number(form.cashCollected) < 0) {
+      errors.cashCollected = 'Cash collected cannot be negative.';
+    }
+    return errors;
+  };
+
+  const validateSalespersonForm = (form) => {
+    const errors = {};
+    if (!form.name || !form.name.trim()) errors.name = 'Name is required.';
+    if (form.email && !EMAIL_REGEX.test(form.email.trim())) {
+      errors.email = 'Enter a valid email address.';
+    }
+    if (form.phone && !PHONE_REGEX.test(form.phone.trim())) {
+      errors.phone = 'Enter a valid phone number.';
+    }
+    return errors;
+  };
+
+  const fieldErrorClass = (hasError) =>
+    hasError ? 'border-rose-400 focus:ring-rose-400 bg-rose-50' : 'border-slate-300 focus:ring-sky-500';
   const [salespersonForm, setSalespersonForm] = useState({
     id: '',
     name: '',
@@ -783,6 +855,13 @@ useEffect(() => {
   const handleSavePipeline = async (e) => {
     e.preventDefault();
 
+    const errors = validatePipelineForm(pipelineForm);
+    setPipelineFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      showErrorPopup(null, 'Please fix the highlighted fields before saving this prospect record.');
+      return;
+    }
+
     const payload = normalizePipelineApiPayload(pipelineForm, salespersonData);
     if (!payload.salesperson) {
       showErrorPopup(null, 'Please wait for the salesperson list to load, then try again.');
@@ -816,6 +895,7 @@ useEffect(() => {
       });
 
       setPipelineForm(emptyPipelineForm);
+      setPipelineFormErrors({});
       setIsPipelineModalOpen(false);
     } catch (error) {
       console.error('Error saving pipeline record:', error);
@@ -825,34 +905,45 @@ useEffect(() => {
 
   const handleEditPipeline = (item) => {
     setPipelineForm(item);
+    setPipelineFormErrors({});
     setIsPipelineModalOpen(true);
   };
 
-  const handleDeletePipeline = async (id) => {
+  const handleDeletePipeline = (id) => {
     if (isSalesUser) return;
 
-    if (!window.confirm('Are you sure you want to delete this customer prospect record?')) {
-      return;
-    }
+    askConfirm({
+      title: 'Delete Customer Prospect',
+      message: 'Are you sure you want to delete this customer prospect record? This action cannot be undone.',
+      confirmLabel: 'Delete Record',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`${PIPELINE_API_URL}${id}/`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch(`${PIPELINE_API_URL}${id}/`, {
-        method: 'DELETE',
-      });
+          if (!response.ok) {
+            throw new Error(`Failed to delete pipeline record (${response.status})`);
+          }
 
-      if (!response.ok) {
-        throw new Error(`Failed to delete pipeline record (${response.status})`);
+          setPipelineData(prev => prev.filter(item => item.id !== id));
+        } catch (error) {
+          console.error('Error deleting pipeline record:', error);
+          showErrorPopup(error, 'Unable to delete the customer pipeline record. Please try again.');
+        }
       }
-
-      setPipelineData(prev => prev.filter(item => item.id !== id));
-    } catch (error) {
-      console.error('Error deleting pipeline record:', error);
-      showErrorPopup(error, 'Unable to delete the customer pipeline record. Please try again.');
-    }
+    });
   };
 
   const handleSaveActivity = async (e) => {
     e.preventDefault();
+
+    const errors = validateActivityForm(activityForm);
+    setActivityFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      showErrorPopup(null, 'Please fix the highlighted fields before saving this activity log.');
+      return;
+    }
 
     const payload = normalizeActivityApiPayload(activityForm, salespersonData);
     if (!payload.salesperson) {
@@ -887,6 +978,7 @@ useEffect(() => {
       });
 
       setActivityForm(emptyActivityForm);
+      setActivityFormErrors({});
       setIsActivityModalOpen(false);
     } catch (error) {
       console.error('Error saving daily activity:', error);
@@ -896,34 +988,45 @@ useEffect(() => {
 
   const handleEditActivity = (item) => {
     setActivityForm(item);
+    setActivityFormErrors({});
     setIsActivityModalOpen(true);
   };
 
-  const handleDeleteActivity = async (id) => {
+  const handleDeleteActivity = (id) => {
     if (isSalesUser) return;
 
-    if (!window.confirm('Are you sure you want to delete this activity log?')) {
-      return;
-    }
+    askConfirm({
+      title: 'Delete Activity Log',
+      message: 'Are you sure you want to delete this activity log? This action cannot be undone.',
+      confirmLabel: 'Delete Log',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`${ACTIVITY_API_URL}${id}/`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch(`${ACTIVITY_API_URL}${id}/`, {
-        method: 'DELETE',
-      });
+          if (!response.ok) {
+            throw new Error(`Failed to delete daily activity (${response.status})`);
+          }
 
-      if (!response.ok) {
-        throw new Error(`Failed to delete daily activity (${response.status})`);
+          setActivityData(prev => prev.filter(item => item.id !== id));
+        } catch (error) {
+          console.error('Error deleting daily activity:', error);
+          showErrorPopup(error, 'Unable to delete the daily activity record. Please try again.');
+        }
       }
-
-      setActivityData(prev => prev.filter(item => item.id !== id));
-    } catch (error) {
-      console.error('Error deleting daily activity:', error);
-      showErrorPopup(error, 'Unable to delete the daily activity record. Please try again.');
-    }
+    });
   };
 
   const handleSaveSalesperson = async (e) => {
     e.preventDefault();
+
+    const errors = validateSalespersonForm(salespersonForm);
+    setSalespersonFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      showErrorPopup(null, 'Please fix the highlighted fields before saving this salesperson.');
+      return;
+    }
 
     const payload = normalizeSalespersonApiPayload(salespersonForm);
     const apiUrl = salespersonForm.id ? `${SALESPERSON_API_URL}${salespersonForm.id}/` : SALESPERSON_API_URL;
@@ -961,6 +1064,7 @@ useEffect(() => {
         department: 'Sales',
         is_active: true
       });
+      setSalespersonFormErrors({});
       setIsSalespersonModalOpen(false);
     } catch (error) {
       console.error('Error saving salesperson:', error);
@@ -977,6 +1081,7 @@ useEffect(() => {
       department: person.department || 'Sales',
       is_active: Boolean(person.is_active)
     });
+    setSalespersonFormErrors({});
     setIsSalespersonModalOpen(true);
   };
 
@@ -985,25 +1090,28 @@ useEffect(() => {
     setIsSalespersonDetailModalOpen(true);
   };
 
-  const handleDeleteSalesperson = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this salesperson?')) {
-      return;
-    }
+  const handleDeleteSalesperson = (id) => {
+    askConfirm({
+      title: 'Delete Salesperson',
+      message: 'Are you sure you want to delete this salesperson? This action cannot be undone.',
+      confirmLabel: 'Delete Salesperson',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`${SALESPERSON_API_URL}${id}/`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch(`${SALESPERSON_API_URL}${id}/`, {
-        method: 'DELETE',
-      });
+          if (!response.ok) {
+            throw new Error(`Failed to delete salesperson (${response.status})`);
+          }
 
-      if (!response.ok) {
-        throw new Error(`Failed to delete salesperson (${response.status})`);
+          setSalespersonData(prev => prev.filter(person => person.id !== id));
+        } catch (error) {
+          console.error('Error deleting salesperson:', error);
+          showErrorPopup(error, 'Unable to delete the salesperson record. Please try again.');
+        }
       }
-
-      setSalespersonData(prev => prev.filter(person => person.id !== id));
-    } catch (error) {
-      console.error('Error deleting salesperson:', error);
-      showErrorPopup(error, 'Unable to delete the salesperson record. Please try again.');
-    }
+    });
   };
 
   const filteredPipeline = useMemo(() => {
@@ -1371,6 +1479,7 @@ useEffect(() => {
                   <button
                     onClick={() => {
                       setPipelineForm(emptyPipelineForm);
+                      setPipelineFormErrors({});
                       setIsPipelineModalOpen(true);
                     }}
                     className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
@@ -1531,6 +1640,7 @@ useEffect(() => {
                         department: 'Sales',
                         is_active: true
                       });
+                      setSalespersonFormErrors({});
                       setIsSalespersonModalOpen(true);
                     }}
                     className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
@@ -1674,6 +1784,7 @@ useEffect(() => {
                 <button
                   onClick={() => {
                     setActivityForm(emptyActivityForm);
+                    setActivityFormErrors({});
                     setIsActivityModalOpen(true);
                   }}
                   className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm w-full md:w-auto justify-center"
@@ -2456,12 +2567,17 @@ useEffect(() => {
                   <label className="block font-semibold text-slate-700 mb-1">Salesperson *</label>
                   <select
                     value={pipelineForm.salesperson}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, salesperson: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2 focus:ring-2 focus:ring-sky-500"
-                    required
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, salesperson: e.target.value });
+                      if (pipelineFormErrors.salesperson) setPipelineFormErrors({ ...pipelineFormErrors, salesperson: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.salesperson)}`}
                   >
                     {salespersons.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  {pipelineFormErrors.salesperson && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.salesperson}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2469,10 +2585,15 @@ useEffect(() => {
                   <input
                     type="text"
                     value={pipelineForm.customer}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, customer: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2 focus:ring-2 focus:ring-sky-500"
-                    required
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, customer: e.target.value });
+                      if (pipelineFormErrors.customer) setPipelineFormErrors({ ...pipelineFormErrors, customer: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.customer)}`}
                   />
+                  {pipelineFormErrors.customer && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.customer}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2500,9 +2621,16 @@ useEffect(() => {
                   <input
                     type="text"
                     value={pipelineForm.telephone}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, telephone: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, telephone: e.target.value });
+                      if (pipelineFormErrors.telephone) setPipelineFormErrors({ ...pipelineFormErrors, telephone: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.telephone)}`}
+                    placeholder="+256 7XX XXX XXX"
                   />
+                  {pipelineFormErrors.telephone && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.telephone}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2541,10 +2669,17 @@ useEffect(() => {
                   <label className="block font-semibold text-slate-700 mb-1">Est Value (UGX)</label>
                   <input
                     type="number"
+                    min="0"
                     value={pipelineForm.estValue}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, estValue: Number(e.target.value) })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, estValue: Number(e.target.value) });
+                      if (pipelineFormErrors.estValue) setPipelineFormErrors({ ...pipelineFormErrors, estValue: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.estValue)}`}
                   />
+                  {pipelineFormErrors.estValue && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.estValue}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2638,25 +2773,36 @@ useEffect(() => {
             <form onSubmit={handleSaveActivity} className="p-6 overflow-y-auto space-y-4 text-xs">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Date</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Date *</label>
                   <input
                     type="date"
                     value={activityForm.date}
-                    onChange={(e) => setActivityForm({ ...activityForm, date: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
-                    required
+                    onChange={(e) => {
+                      setActivityForm({ ...activityForm, date: e.target.value });
+                      if (activityFormErrors.date) setActivityFormErrors({ ...activityFormErrors, date: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(activityFormErrors.date)}`}
                   />
+                  {activityFormErrors.date && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.date}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Salesperson</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Salesperson *</label>
                   <select
                     value={activityForm.salesperson}
-                    onChange={(e) => setActivityForm({ ...activityForm, salesperson: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setActivityForm({ ...activityForm, salesperson: e.target.value });
+                      if (activityFormErrors.salesperson) setActivityFormErrors({ ...activityFormErrors, salesperson: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(activityFormErrors.salesperson)}`}
                   >
                     {salespersons.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  {activityFormErrors.salesperson && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.salesperson}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2670,14 +2816,19 @@ useEffect(() => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Customer / Company</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Customer / Company *</label>
                   <input
                     type="text"
                     value={activityForm.customer}
-                    onChange={(e) => setActivityForm({ ...activityForm, customer: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
-                    required
+                    onChange={(e) => {
+                      setActivityForm({ ...activityForm, customer: e.target.value });
+                      if (activityFormErrors.customer) setActivityFormErrors({ ...activityFormErrors, customer: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(activityFormErrors.customer)}`}
                   />
+                  {activityFormErrors.customer && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.customer}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2711,10 +2862,17 @@ useEffect(() => {
                   <label className="block font-semibold text-slate-700 mb-1">Cash Collected (UGX)</label>
                   <input
                     type="number"
+                    min="0"
                     value={activityForm.cashCollected}
-                    onChange={(e) => setActivityForm({ ...activityForm, cashCollected: Number(e.target.value) })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setActivityForm({ ...activityForm, cashCollected: Number(e.target.value) });
+                      if (activityFormErrors.cashCollected) setActivityFormErrors({ ...activityFormErrors, cashCollected: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(activityFormErrors.cashCollected)}`}
                   />
+                  {activityFormErrors.cashCollected && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.cashCollected}</p>
+                  )}
                 </div>
               </div>
 
@@ -2777,10 +2935,15 @@ useEffect(() => {
                   <input
                     type="text"
                     value={salespersonForm.name}
-                    onChange={(e) => setSalespersonForm({ ...salespersonForm, name: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2 focus:ring-2 focus:ring-sky-500"
-                    required
+                    onChange={(e) => {
+                      setSalespersonForm({ ...salespersonForm, name: e.target.value });
+                      if (salespersonFormErrors.name) setSalespersonFormErrors({ ...salespersonFormErrors, name: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(salespersonFormErrors.name)}`}
                   />
+                  {salespersonFormErrors.name && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{salespersonFormErrors.name}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2788,9 +2951,15 @@ useEffect(() => {
                   <input
                     type="email"
                     value={salespersonForm.email}
-                    onChange={(e) => setSalespersonForm({ ...salespersonForm, email: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setSalespersonForm({ ...salespersonForm, email: e.target.value });
+                      if (salespersonFormErrors.email) setSalespersonFormErrors({ ...salespersonFormErrors, email: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(salespersonFormErrors.email)}`}
                   />
+                  {salespersonFormErrors.email && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{salespersonFormErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2798,9 +2967,16 @@ useEffect(() => {
                   <input
                     type="text"
                     value={salespersonForm.phone}
-                    onChange={(e) => setSalespersonForm({ ...salespersonForm, phone: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setSalespersonForm({ ...salespersonForm, phone: e.target.value });
+                      if (salespersonFormErrors.phone) setSalespersonFormErrors({ ...salespersonFormErrors, phone: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(salespersonFormErrors.phone)}`}
+                    placeholder="+256 7XX XXX XXX"
                   />
+                  {salespersonFormErrors.phone && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{salespersonFormErrors.phone}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2949,6 +3125,41 @@ useEffect(() => {
                 className="px-4 py-1.5 bg-slate-800 text-white rounded font-medium hover:bg-slate-900"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL (replaces window.confirm) */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100">
+                  <AlertCircle className="h-5 w-5 text-rose-600" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-900">{confirmDialog.title || 'Confirm Action'}</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{confirmDialog.message}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 p-3">
+              <button
+                type="button"
+                onClick={closeConfirmDialog}
+                className="px-4 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmProceed}
+                className="px-4 py-2 rounded-lg bg-rose-600 text-xs font-semibold text-white hover:bg-rose-700"
+              >
+                {confirmDialog.confirmLabel}
               </button>
             </div>
           </div>
