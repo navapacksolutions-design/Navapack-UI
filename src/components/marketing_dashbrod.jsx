@@ -58,10 +58,20 @@ const normalizeStatusLabel = (value) => {
 };
 
 const normalizePipelineApiPayload = (form, salespersonMap = []) => {
-  const salespersonId = salespersonMap.find(person => person.name === form.salesperson)?.id ?? form.salesperson;
+  const salesperson = salespersonMap.find(person => person.name === form.salesperson);
+  const salespersonId = salesperson?.id ?? (Number.isFinite(Number(form.salesperson)) ? Number(form.salesperson) : null);
+  const normalizeApiDate = (value) => {
+    const match = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
+    return match ? match[0] : undefined;
+  };
+  const dateAdded = normalizeApiDate(form.dateAdded);
+  const lastContactDate = normalizeApiDate(form.lastContactDate);
+  const nextFollowupDate = normalizeApiDate(form.nextFollowUpDate);
+  const stageLastUpdated = normalizeApiDate(form.stageLastUpdated);
 
   return {
-    date_added: form.dateAdded || '',
+    prospect_id: form.prospectId || `PRO-${Date.now()}`,
+    date_added: dateAdded || null,
     salesperson: salespersonId,
     customer_company: form.customer || '',
     location_town: form.location || '',
@@ -70,13 +80,13 @@ const normalizePipelineApiPayload = (form, salespersonMap = []) => {
     customer_type: form.customerType || '',
     product_service: form.product || '',
     requirement_specifications: form.specs || '',
-    estimated_quantity: form.estQty || '',
+    estimated_quantity: Number(form.estQty || 0),
     unit: form.unit || 'Pcs',
     estimated_value_ugx: Number(form.estValue || 0),
-    last_contact_date: form.lastContactDate || '',
+    ...(lastContactDate ? { last_contact_date: lastContactDate } : {}),
     last_discussion_feedback: form.lastDiscussion || '',
     next_action: form.nextAction || '',
-    next_followup_date: form.nextFollowUpDate || '',
+    ...(nextFollowupDate ? { next_followup_date: nextFollowupDate } : {}),
     followup_status: (form.followUpStatus || 'Pending').toUpperCase(),
     sales_stage: form.salesStage || '',
     probability_pct: Number(form.probability || 0),
@@ -87,7 +97,7 @@ const normalizePipelineApiPayload = (form, salespersonMap = []) => {
     reason_lost: form.reasonLost || '',
     remarks_management_notes: form.remarks || '',
     competitor_won_by: form.competitor || '',
-    stage_last_updated: form.stageLastUpdated || '',
+    ...(stageLastUpdated ? { stage_last_updated: stageLastUpdated } : {}),
     corrective_action: form.correctiveAction || ''
   };
 };
@@ -126,7 +136,14 @@ const normalizePipelineRecord = (item, fallbackId) => ({
 });
 
 const normalizeActivityApiPayload = (form, salespersonMap = []) => {
-  const salespersonId = salespersonMap.find(person => person.name === form.salesperson)?.id ?? form.salesperson;
+  const salesperson = salespersonMap.find(person => person.name === form.salesperson);
+  const salespersonId = salesperson?.id ?? (Number.isFinite(Number(form.salesperson)) ? Number(form.salesperson) : null);
+  const normalizeApiDate = (value) => {
+    const match = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
+    return match ? match[0] : undefined;
+  };
+  const nextFollowupDate = normalizeApiDate(form.nextFollowUpDate);
+  const requiredByDate = normalizeApiDate(form.requiredByDate);
 
   return {
     salesperson: salespersonId,
@@ -142,15 +159,16 @@ const normalizeActivityApiPayload = (form, salespersonMap = []) => {
     requirement_estimated_volume: form.reqEstVolume || '',
     discussion_outcome: form.discussionOutcome || '',
     next_action: form.nextAction || '',
-    next_followup_date: form.nextFollowUpDate || '',
+    ...(nextFollowupDate ? { next_followup_date: nextFollowupDate } : {}),
     quotation_submitted_value_ugx: Number(form.quotationSubmittedValue || 0),
     order_received_value_ugx: Number(form.orderReceivedValue || 0),
     cash_collected_ugx: Number(form.cashCollected || 0),
     market_competitor_intelligence: form.marketIntel || '',
     management_support_needed: form.mgmtSupportNeeded || '',
     responsible_person_dept: form.respDept || '',
-    required_by_date: form.requiredByDate || '',
-    issue_status: form.issueStatus || ''
+    ...(requiredByDate ? { required_by_date: requiredByDate } : {}),
+    issue_status: form.issueStatus || '',
+    customer_pipeline: form.customerPipeline ?? null
   };
 };
 
@@ -461,6 +479,11 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [salespersonData, setSalespersonData] = useState([]);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [dashboardMetricsError, setDashboardMetricsError] = useState('');
+  const [errorPopup, setErrorPopup] = useState('');
+
+  const showErrorPopup = (error, fallbackMessage) => {
+    setErrorPopup(error instanceof Error ? error.message : fallbackMessage);
+  };
   const [salespersonForm, setSalespersonForm] = useState({
     id: '',
     name: '',
@@ -761,6 +784,10 @@ useEffect(() => {
     e.preventDefault();
 
     const payload = normalizePipelineApiPayload(pipelineForm, salespersonData);
+    if (!payload.salesperson) {
+      showErrorPopup(null, 'Please wait for the salesperson list to load, then try again.');
+      return;
+    }
     const apiUrl = pipelineForm.id ? `${PIPELINE_API_URL}${pipelineForm.id}/` : PIPELINE_API_URL;
     const method = pipelineForm.id ? 'PUT' : 'POST';
 
@@ -792,7 +819,7 @@ useEffect(() => {
       setIsPipelineModalOpen(false);
     } catch (error) {
       console.error('Error saving pipeline record:', error);
-      alert('Unable to save the customer pipeline record. Please try again.');
+      showErrorPopup(error, 'Unable to save the customer pipeline record. Please try again.');
     }
   };
 
@@ -820,7 +847,7 @@ useEffect(() => {
       setPipelineData(prev => prev.filter(item => item.id !== id));
     } catch (error) {
       console.error('Error deleting pipeline record:', error);
-      alert('Unable to delete the customer pipeline record. Please try again.');
+      showErrorPopup(error, 'Unable to delete the customer pipeline record. Please try again.');
     }
   };
 
@@ -828,6 +855,10 @@ useEffect(() => {
     e.preventDefault();
 
     const payload = normalizeActivityApiPayload(activityForm, salespersonData);
+    if (!payload.salesperson) {
+      showErrorPopup(null, 'Please wait for the salesperson list to load, then try again.');
+      return;
+    }
     const apiUrl = activityForm.id ? `${ACTIVITY_API_URL}${activityForm.id}/` : ACTIVITY_API_URL;
     const method = activityForm.id ? 'PUT' : 'POST';
 
@@ -859,7 +890,7 @@ useEffect(() => {
       setIsActivityModalOpen(false);
     } catch (error) {
       console.error('Error saving daily activity:', error);
-      alert('Unable to save the daily activity record. Please try again.');
+      showErrorPopup(error, 'Unable to save the daily activity record. Please try again.');
     }
   };
 
@@ -887,7 +918,7 @@ useEffect(() => {
       setActivityData(prev => prev.filter(item => item.id !== id));
     } catch (error) {
       console.error('Error deleting daily activity:', error);
-      alert('Unable to delete the daily activity record. Please try again.');
+      showErrorPopup(error, 'Unable to delete the daily activity record. Please try again.');
     }
   };
 
@@ -933,7 +964,7 @@ useEffect(() => {
       setIsSalespersonModalOpen(false);
     } catch (error) {
       console.error('Error saving salesperson:', error);
-      alert('Unable to save the salesperson record. Please try again.');
+      showErrorPopup(error, 'Unable to save the salesperson record. Please try again.');
     }
   };
 
@@ -971,7 +1002,7 @@ useEffect(() => {
       setSalespersonData(prev => prev.filter(person => person.id !== id));
     } catch (error) {
       console.error('Error deleting salesperson:', error);
-      alert('Unable to delete the salesperson record. Please try again.');
+      showErrorPopup(error, 'Unable to delete the salesperson record. Please try again.');
     }
   };
 
@@ -1001,6 +1032,25 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+      {errorPopup && (
+        <div className="fixed right-4 top-4 z-[100] w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-rose-200 bg-white p-4 shadow-2xl" role="alert">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-bold text-rose-900">Unable to complete request</h2>
+              <p className="mt-1 break-words whitespace-pre-wrap text-xs leading-5 text-slate-700">{errorPopup}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setErrorPopup('')}
+              className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Close error message"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
       {/* Main Container */}
       <div className="flex-1 w-full px-6 lg:px-8 xl:px-10 py-8 flex flex-col lg:flex-row gap-8">
         
