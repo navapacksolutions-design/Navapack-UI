@@ -473,6 +473,7 @@ const formatUGX = (amount) => {
 
 export default function App({ onLogout, department = 'marketing', user = {} }) {
   const isSalesUser = department.trim().toLowerCase() === 'sales';
+  const loggedInSalespersonName = user.name?.trim().toLowerCase() || '';
   const [activeTab, setActiveTab] = useState(isSalesUser ? 'pipeline' : 'dashboard');
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
@@ -1117,8 +1118,18 @@ useEffect(() => {
     });
   };
 
+  const visiblePipelineData = useMemo(() => {
+    if (!isSalesUser) return pipelineData;
+    return pipelineData.filter(item => item.salesperson?.trim().toLowerCase() === loggedInSalespersonName);
+  }, [isSalesUser, loggedInSalespersonName, pipelineData]);
+
+  const visibleActivityData = useMemo(() => {
+    if (!isSalesUser) return activityData;
+    return activityData.filter(item => item.salesperson?.trim().toLowerCase() === loggedInSalespersonName);
+  }, [isSalesUser, loggedInSalespersonName, activityData]);
+
   const filteredPipeline = useMemo(() => {
-    return pipelineData.filter(item => {
+    return visiblePipelineData.filter(item => {
       const matchesSearch = 
         item.customer.toLowerCase().includes(pipelineSearch.toLowerCase()) ||
         item.salesperson.toLowerCase().includes(pipelineSearch.toLowerCase()) ||
@@ -1132,10 +1143,10 @@ useEffect(() => {
       undefined,
       { numeric: true, sensitivity: 'base' }
     ));
-  }, [pipelineData, pipelineSearch, pipelineStageFilter]);
+  }, [visiblePipelineData, pipelineSearch, pipelineStageFilter]);
 
   const filteredActivities = useMemo(() => {
-    return activityData.filter(item => {
+    return visibleActivityData.filter(item => {
       return (
         item.customer.toLowerCase().includes(activitySearch.toLowerCase()) ||
         item.salesperson.toLowerCase().includes(activitySearch.toLowerCase()) ||
@@ -1147,7 +1158,7 @@ useEffect(() => {
       undefined,
       { numeric: true, sensitivity: 'base' }
     ));
-  }, [activityData, activitySearch]);
+  }, [visibleActivityData, activitySearch]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
@@ -1505,7 +1516,7 @@ useEffect(() => {
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-3 bg-sky-800 text-white flex justify-between items-center text-xs">
                   <span className="font-semibold uppercase tracking-wider">Master Customer Pipeline Database (29 Data Fields)</span>
-                  <span>Showing {filteredPipeline.length} of {pipelineData.length} records</span>
+                  <span>Showing {filteredPipeline.length} of {visiblePipelineData.length} records</span>
                 </div>
                 
                 <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
