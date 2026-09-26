@@ -21,8 +21,21 @@ const INITIAL_PRODUCTS = [
 const PIPELINE_API_URL = 'https://api.navapacksolutions.com/api/pipeline/';
 const ACTIVITY_API_URL = 'https://api.navapacksolutions.com/api/daily-activities/';
 const SALESPERSON_API_URL = 'https://api.navapacksolutions.com/api/salespersons/';
+const PRODUCT_SERVICE_API_URL = 'https://api.navapacksolutions.com/api/product-services/';
+const SALES_STAGE_API_URL = 'https://api.navapacksolutions.com/api/sales-stages/';
+const ACTIVITY_TYPE_API_URL = 'https://api.navapacksolutions.com/api/activity-types/';
+const UNIT_API_URL = 'https://api.navapacksolutions.com/api/units/';
 const DASHBOARD_METRICS_API_URL = 'https://api.navapacksolutions.com/api/dashboard-metrics/';
 const REPORTS_API_URL = 'https://api.navapacksolutions.com/api/reports/';
+
+const normalizeMasterOptionList = (items) =>
+  Array.isArray(items)
+    ? items
+        .map((item) => (typeof item === 'string' ? item : item?.name || ''))
+        .filter(Boolean)
+    : [];
+
+const normalizeMasterOptionValue = (value) => String(value || '').trim();
 
 const normalizeSalespersonApiPayload = (form) => ({
   name: form.name || '',
@@ -478,6 +491,11 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
   const [salespersonData, setSalespersonData] = useState([]);
+  const [salespersons, setSalespersons] = useState(INITIAL_SALESPERSONS);
+  const [productServices, setProductServices] = useState(INITIAL_PRODUCTS);
+  const [salesStages, setSalesStages] = useState(INITIAL_SALES_STAGES);
+  const [activityTypes, setActivityTypes] = useState(['Physical Visit', 'Follow-up Interaction', 'Phone Call', 'Email Quote']);
+  const [units, setUnits] = useState(['Pcs', 'Kg', 'Bags', 'Rolls', 'Boxes']);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [dashboardMetricsError, setDashboardMetricsError] = useState('');
   const [errorPopup, setErrorPopup] = useState('');
@@ -571,13 +589,9 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [isSalespersonModalOpen, setIsSalespersonModalOpen] = useState(false);
   const [isSalespersonDetailModalOpen, setIsSalespersonDetailModalOpen] = useState(false);
   const [selectedSalespersonItem, setSelectedSalespersonItem] = useState(null);
-  const [salesStages, setSalesStages] = useState(INITIAL_SALES_STAGES);
   const [customerTypes, setCustomerTypes] = useState(INITIAL_CUSTOMER_TYPES);
   const [departments, setDepartments] = useState(INITIAL_DEPTS);
   const [issueStatuses, setIssueStatuses] = useState(INITIAL_ISSUE_STATUSES);
-  const salespersons = salespersonData.length > 0
-  ? salespersonData.map(person => person.name)
-  : INITIAL_SALESPERSONS;
   const loggedInSalesperson = salespersonData.find(person => {
     const userEmail = user.email?.trim().toLowerCase();
     const userName = user.name?.trim().toLowerCase();
@@ -616,17 +630,17 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     contactPerson: '',
     telephone: '',
     customerType: customerTypes[0],
-    product: INITIAL_PRODUCTS[0],
+    product: productServices[0] || INITIAL_PRODUCTS[0],
     specs: '',
     estQty: '',
-    unit: 'Pcs',
+    unit: units[0] || 'Pcs',
     estValue: 0,
     lastContactDate: new Date().toISOString().split('T')[0],
     lastDiscussion: '',
     nextAction: '',
     nextFollowUpDate: '',
     followUpStatus: 'Pending',
-    salesStage: salesStages[0],
+    salesStage: salesStages[0] || INITIAL_SALES_STAGES[0],
     probability: 50,
     quotationNo: '',
     quotationValue: 0,
@@ -651,8 +665,8 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     prospectStatus: 'New Prospect Identified',
     contactPerson: '',
     telephone: '',
-    product: INITIAL_PRODUCTS[0],
-    activityType: 'Physical Visit',
+    product: productServices[0] || INITIAL_PRODUCTS[0],
+    activityType: activityTypes[0] || 'Physical Visit',
     reqEstVolume: '',
     discussionOutcome: '',
     nextAction: '',
@@ -673,10 +687,57 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [newListInputs, setNewListInputs] = useState({
     salesperson: '',
     salesStage: '',
-    customerType: '',
-    department: '',
-    issueStatus: ''
+    productService: '',
+    unit: '',
+    activityType: ''
   });
+
+  const handleAddMasterOption = async (listType, rawValue) => {
+    const value = normalizeMasterOptionValue(rawValue);
+    if (!value) return;
+
+    const endpointMap = {
+      salesperson: SALESPERSON_API_URL,
+      salesStage: SALES_STAGE_API_URL,
+      productService: PRODUCT_SERVICE_API_URL,
+      unit: UNIT_API_URL,
+      activityType: ACTIVITY_TYPE_API_URL
+    };
+
+    const setterMap = {
+      salesperson: setSalespersons,
+      salesStage: setSalesStages,
+      productService: setProductServices,
+      unit: setUnits,
+      activityType: setActivityTypes
+    };
+
+    const endpoint = endpointMap[listType];
+    const setter = setterMap[listType];
+
+    if (!endpoint || !setter) return;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: value })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save ${listType}`);
+      }
+
+      const created = await response.json();
+      const incomingName = normalizeMasterOptionValue(created?.name || value);
+      setter((prev) => (prev.includes(incomingName) ? prev : [...prev, incomingName]));
+      setNewListInputs((prev) => ({ ...prev, [listType]: '' }));
+    } catch (error) {
+      console.error(`Error saving ${listType}:`, error);
+      setter((prev) => (prev.includes(value) ? prev : [...prev, value]));
+      setNewListInputs((prev) => ({ ...prev, [listType]: '' }));
+    }
+  };
   useEffect(() => {
   fetch('https://api.navapacksolutions.com/api/pipeline/')
     .then(response => {
@@ -725,6 +786,31 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
       console.error('Error fetching pipeline data:', error);
     });
 }, []);
+
+useEffect(() => {
+  const masterEndpoints = [
+    { url: PRODUCT_SERVICE_API_URL, setter: setProductServices },
+    { url: SALES_STAGE_API_URL, setter: setSalesStages },
+    { url: ACTIVITY_TYPE_API_URL, setter: setActivityTypes },
+    { url: UNIT_API_URL, setter: setUnits }
+  ];
+
+  masterEndpoints.forEach(({ url, setter }) => {
+    fetch(url)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${url}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setter(normalizeMasterOptionList(data));
+      })
+      .catch((error) => {
+        console.error(`Error fetching master options from ${url}:`, error);
+      });
+  });
+}, []);
 // Daily Activity API
 useEffect(() => {
   fetch(ACTIVITY_API_URL)
@@ -744,7 +830,7 @@ useEffect(() => {
 }, []);
 // Salesperson API
 useEffect(() => {
-  fetch('https://api.navapacksolutions.com/api/salespersons/')
+  fetch(SALESPERSON_API_URL)
     .then(response => {
       if (!response.ok) {
         throw new Error('Failed to fetch salespersons');
@@ -752,11 +838,14 @@ useEffect(() => {
       return response.json();
     })
     .then(data => {
-      console.log('SALESPERSON DATA:', data);
+      const names = normalizeMasterOptionList(data.map((person) => ({ name: person?.name || person?.salesperson_name || '' })))
+        .filter(Boolean);
       setSalespersonData(data);
+      setSalespersons(names.length ? names : INITIAL_SALESPERSONS);
     })
     .catch(error => {
       console.error('Error fetching salespersons:', error);
+      setSalespersons(INITIAL_SALESPERSONS);
     });
 }, []);
 
@@ -2383,42 +2472,6 @@ useEffect(() => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                
-                {/* Salespersons List */}
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                  <h3 className="font-bold text-sm text-slate-800 pb-2 border-b border-slate-200 flex items-center justify-between">
-                    <span>Sales Representatives</span>
-                    <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{salespersons.length}</span>
-                  </h3>
-                  <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
-                    {salespersons.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                        <span className="font-medium text-slate-700">{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add Sales Rep..."
-                      value={newListInputs.salesperson}
-                      onChange={(e) => setNewListInputs({ ...newListInputs, salesperson: e.target.value })}
-                      className="flex-1 text-xs border border-slate-300 rounded p-1.5 focus:outline-none"
-                    />
-                    <button
-                      onClick={() => {
-                        if (newListInputs.salesperson.trim()) {
-                          setSalespersons([...salespersons, newListInputs.salesperson.trim()]);
-                          setNewListInputs({ ...newListInputs, salesperson: '' });
-                        }
-                      }}
-                      className="bg-sky-600 text-white text-xs px-3 py-1.5 rounded font-medium hover:bg-sky-700"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-
                 {/* Sales Stages List */}
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                   <h3 className="font-bold text-sm text-slate-800 pb-2 border-b border-slate-200 flex items-center justify-between">
@@ -2454,15 +2507,15 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {/* Customer Types List */}
+                {/* Product / Services List */}
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                   <h3 className="font-bold text-sm text-slate-800 pb-2 border-b border-slate-200 flex items-center justify-between">
-                    <span>Customer Types</span>
-                    <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{customerTypes.length}</span>
+                    <span>Product / Services</span>
+                    <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{productServices.length}</span>
                   </h3>
                   <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
-                    {customerTypes.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded border border-slate-100">
+                    {productServices.map((item, idx) => (
+                      <div key={`${item}-${idx}`} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded border border-slate-100">
                         <span className="font-medium text-slate-700">{item}</span>
                       </div>
                     ))}
@@ -2470,18 +2523,13 @@ useEffect(() => {
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"
-                      placeholder="Add Customer Type..."
-                      value={newListInputs.customerType}
-                      onChange={(e) => setNewListInputs({ ...newListInputs, customerType: e.target.value })}
+                      placeholder="Add product/service..."
+                      value={newListInputs.productService}
+                      onChange={(e) => setNewListInputs({ ...newListInputs, productService: e.target.value })}
                       className="flex-1 text-xs border border-slate-300 rounded p-1.5 focus:outline-none"
                     />
                     <button
-                      onClick={() => {
-                        if (newListInputs.customerType.trim()) {
-                          setCustomerTypes([...customerTypes, newListInputs.customerType.trim()]);
-                          setNewListInputs({ ...newListInputs, customerType: '' });
-                        }
-                      }}
+                      onClick={() => handleAddMasterOption('productService', newListInputs.productService)}
                       className="bg-sky-600 text-white text-xs px-3 py-1.5 rounded font-medium hover:bg-sky-700"
                     >
                       Add
@@ -2489,15 +2537,15 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {/* Departments List */}
+                {/* Units List */}
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                   <h3 className="font-bold text-sm text-slate-800 pb-2 border-b border-slate-200 flex items-center justify-between">
-                    <span>Departments</span>
-                    <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{departments.length}</span>
+                    <span>Units</span>
+                    <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{units.length}</span>
                   </h3>
                   <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
-                    {departments.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded border border-slate-100">
+                    {units.map((item, idx) => (
+                      <div key={`${item}-${idx}`} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded border border-slate-100">
                         <span className="font-medium text-slate-700">{item}</span>
                       </div>
                     ))}
@@ -2505,18 +2553,13 @@ useEffect(() => {
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"
-                      placeholder="Add Dept..."
-                      value={newListInputs.department}
-                      onChange={(e) => setNewListInputs({ ...newListInputs, department: e.target.value })}
+                      placeholder="Add unit..."
+                      value={newListInputs.unit}
+                      onChange={(e) => setNewListInputs({ ...newListInputs, unit: e.target.value })}
                       className="flex-1 text-xs border border-slate-300 rounded p-1.5 focus:outline-none"
                     />
                     <button
-                      onClick={() => {
-                        if (newListInputs.department.trim()) {
-                          setDepartments([...departments, newListInputs.department.trim()]);
-                          setNewListInputs({ ...newListInputs, department: '' });
-                        }
-                      }}
+                      onClick={() => handleAddMasterOption('unit', newListInputs.unit)}
                       className="bg-sky-600 text-white text-xs px-3 py-1.5 rounded font-medium hover:bg-sky-700"
                     >
                       Add
@@ -2524,15 +2567,15 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {/* Issue Statuses List */}
+                {/* Activity Types List */}
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                   <h3 className="font-bold text-sm text-slate-800 pb-2 border-b border-slate-200 flex items-center justify-between">
-                    <span>Issue Status Options</span>
-                    <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{issueStatuses.length}</span>
+                    <span>Activity Types</span>
+                    <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{activityTypes.length}</span>
                   </h3>
                   <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
-                    {issueStatuses.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded border border-slate-100">
+                    {activityTypes.map((item, idx) => (
+                      <div key={`${item}-${idx}`} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded border border-slate-100">
                         <span className="font-medium text-slate-700">{item}</span>
                       </div>
                     ))}
@@ -2540,18 +2583,13 @@ useEffect(() => {
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"
-                      placeholder="Add Issue Status..."
-                      value={newListInputs.issueStatus}
-                      onChange={(e) => setNewListInputs({ ...newListInputs, issueStatus: e.target.value })}
+                      placeholder="Add activity type..."
+                      value={newListInputs.activityType}
+                      onChange={(e) => setNewListInputs({ ...newListInputs, activityType: e.target.value })}
                       className="flex-1 text-xs border border-slate-300 rounded p-1.5 focus:outline-none"
                     />
                     <button
-                      onClick={() => {
-                        if (newListInputs.issueStatus.trim()) {
-                          setIssueStatuses([...issueStatuses, newListInputs.issueStatus.trim()]);
-                          setNewListInputs({ ...newListInputs, issueStatus: '' });
-                        }
-                      }}
+                      onClick={() => handleAddMasterOption('activityType', newListInputs.activityType)}
                       className="bg-sky-600 text-white text-xs px-3 py-1.5 rounded font-medium hover:bg-sky-700"
                     >
                       Add
@@ -2673,7 +2711,20 @@ useEffect(() => {
                     onChange={(e) => setPipelineForm({ ...pipelineForm, product: e.target.value })}
                     className="w-full border border-slate-300 rounded p-2"
                   >
-                    {INITIAL_PRODUCTS.map(p => <option key={p} value={p}>{p}</option>)}
+                    {(productServices.length ? productServices : INITIAL_PRODUCTS).map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Unit</label>
+                  <select
+                    value={pipelineForm.unit}
+                    onChange={(e) => setPipelineForm({ ...pipelineForm, unit: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  >
+                    {(units.length ? units : ['Pcs', 'Kg', 'Bags', 'Rolls', 'Boxes']).map(unit => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -2711,7 +2762,7 @@ useEffect(() => {
                     onChange={(e) => setPipelineForm({ ...pipelineForm, salesStage: e.target.value })}
                     className="w-full border border-slate-300 rounded p-2"
                   >
-                    {salesStages.map(s => <option key={s} value={s}>{s}</option>)}
+                    {(salesStages.length ? salesStages : INITIAL_SALES_STAGES).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
 
@@ -2860,10 +2911,9 @@ useEffect(() => {
                     onChange={(e) => setActivityForm({ ...activityForm, activityType: e.target.value })}
                     className="w-full border border-slate-300 rounded p-2"
                   >
-                    <option value="Physical Visit">Physical Visit</option>
-                    <option value="Follow-up Interaction">Follow-up Interaction</option>
-                    <option value="Phone Call">Phone Call</option>
-                    <option value="Email Quote">Email Quote</option>
+                    {(activityTypes.length ? activityTypes : ['Physical Visit', 'Follow-up Interaction', 'Phone Call', 'Email Quote']).map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
                   </select>
                 </div>
 
