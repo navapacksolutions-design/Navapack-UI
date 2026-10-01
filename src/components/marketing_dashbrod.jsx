@@ -1587,6 +1587,7 @@ useEffect(() => {
                 </div>
 
                 <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
+
                   <button
                     onClick={() => {
                       setPipelineForm(emptyPipelineForm);
@@ -1598,6 +1599,7 @@ useEffect(() => {
                     <Plus className="w-4 h-4" />
                     <span>Add New Prospect</span>
                   </button>
+
                 </div>
               </div>
 
@@ -1892,17 +1894,17 @@ useEffect(() => {
                   />
                 </div>
 
-                <button
-                  onClick={() => {
-                    setActivityForm(emptyActivityForm);
-                    setActivityFormErrors({});
-                    setIsActivityModalOpen(true);
-                  }}
-                  className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm w-full md:w-auto justify-center"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Log New Daily Activity</span>
-                </button>
+<button
+  onClick={() => {
+    setActivityForm(emptyActivityForm);
+    setActivityFormErrors({});
+    setIsActivityModalOpen(true);
+  }}
+  className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm w-full md:w-auto justify-center"
+>
+  <Plus className="w-4 h-4" />
+  <span>Log New Daily Activity</span>
+</button>
               </div>
 
               {/* Data Table */}
@@ -2905,6 +2907,46 @@ useEffect(() => {
                 </div>
 
                 <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Specific Location</label>
+                  <input
+                    type="text"
+                    value={activityForm.specificLocation}
+                    onChange={(e) => setActivityForm({ ...activityForm, specificLocation: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Prospect Status</label>
+                  <input
+                    type="text"
+                    value={activityForm.prospectStatus}
+                    onChange={(e) => setActivityForm({ ...activityForm, prospectStatus: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Contact Person</label>
+                  <input
+                    type="text"
+                    value={activityForm.contactPerson}
+                    onChange={(e) => setActivityForm({ ...activityForm, contactPerson: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Telephone</label>
+                  <input
+                    type="text"
+                    value={activityForm.telephone}
+                    onChange={(e) => setActivityForm({ ...activityForm, telephone: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">Activity Type</label>
                   <select
                     value={activityForm.activityType}
@@ -2963,6 +3005,26 @@ useEffect(() => {
                     <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.cashCollected}</p>
                   )}
                 </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Product / Service</label>
+                  <input
+                    type="text"
+                    value={activityForm.product}
+                    onChange={(e) => setActivityForm({ ...activityForm, product: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Estimated Volume</label>
+                  <input
+                    type="text"
+                    value={activityForm.reqEstVolume}
+                    onChange={(e) => setActivityForm({ ...activityForm, reqEstVolume: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
               </div>
 
               <div>
@@ -2976,11 +3038,80 @@ useEffect(() => {
               </div>
 
               <div>
+                <label className="block font-semibold text-slate-700 mb-1">Next Action</label>
+                <input
+                  type="text"
+                  value={activityForm.nextAction}
+                  onChange={(e) => setActivityForm({ ...activityForm, nextAction: e.target.value })}
+                  className="w-full border border-slate-300 rounded p-2"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Next Follow-up Date</label>
+                  <input
+                    type="date"
+                    value={activityForm.nextFollowUpDate}
+                    onChange={(e) => setActivityForm({ ...activityForm, nextFollowUpDate: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Quotation Submitted (UGX)</label>
+                  <input
+                    type="number"
+                    value={activityForm.quotationSubmittedValue}
+                    onChange={(e) => setActivityForm({ ...activityForm, quotationSubmittedValue: Number(e.target.value) })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Order Received (UGX)</label>
+                  <input
+                    type="number"
+                    value={activityForm.orderReceivedValue}
+                    onChange={(e) => setActivityForm({ ...activityForm, orderReceivedValue: Number(e.target.value) })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Responsible Department</label>
+                  <select
+                    value={activityForm.respDept}
+                    onChange={(e) => setActivityForm({ ...activityForm, respDept: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  >
+                    {departments.map(department => <option key={department} value={department}>{department}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Required By Date</label>
+                  <input
+                    type="date"
+                    value={activityForm.requiredByDate}
+                    onChange={(e) => setActivityForm({ ...activityForm, requiredByDate: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                  />
+                </div>
+              </div>
+
+              <div>
                 <label className="block font-semibold text-slate-700 mb-1">Market / Competitor Intelligence</label>
                 <textarea
                   rows="2"
                   value={activityForm.marketIntel}
                   onChange={(e) => setActivityForm({ ...activityForm, marketIntel: e.target.value })}
+                  className="w-full border border-slate-300 rounded p-2"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Management Support Needed</label>
+                <textarea
+                  rows="2"
+                  value={activityForm.mgmtSupportNeeded}
+                  onChange={(e) => setActivityForm({ ...activityForm, mgmtSupportNeeded: e.target.value })}
                   className="w-full border border-slate-300 rounded p-2"
                 />
               </div>
