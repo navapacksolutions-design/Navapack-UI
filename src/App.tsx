@@ -406,19 +406,7 @@ export default function App() {
                 }
               />
             )}
-            {currentScreen === 'marketing-dashboard' && (
-              <MarketingDashboard
-                department={loggedInDepartment}
-                onLogout={() => {
-                  setLoggedInDepartment('');
-                  sessionStorage.removeItem('navapack_department');
-                  handleNavigate(
-                    'login',
-                    'push_back'
-      );
-    }}
-  />
-)}
+            
 
 {currentScreen === 'hr-dashboard' && (
   <HRDashboard />
