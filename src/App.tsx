@@ -21,6 +21,7 @@ import { WhatsAppButton } from './components/WhatsAppButton';
 // import { AdminProductsScreen } from './components/AdminProductsScreen';
 import { Dashboard } from './components/Dashboard';
 import MarketingDashboard from './components/marketing_dashbrod.jsx';
+import { HRDashboard } from './components/hr_dashboard';
 
 export default function App() {
   // Get current screen from URL
@@ -38,6 +39,7 @@ export default function App() {
       'admin-products',
       'dashboard',
       'marketing-dashboard',
+      'hr-dashboard',
     ];
 
     return validScreens.includes(path)
@@ -323,12 +325,14 @@ export default function App() {
                   sessionStorage.setItem('navapack_department', department || '');
                   sessionStorage.setItem('navapack_user', JSON.stringify(userIdentity));
                   handleNavigate(
-                    department === 'sales' || department === 'marketing'
-                      ? 'marketing-dashboard'
-                      : 'dashboard',
+                    department === 'hr'
+                      ? 'hr-dashboard'
+                      : department === 'sales' || department === 'marketing'
+                        ? 'marketing-dashboard'
+                        : 'dashboard',
                     'none'
-                  );
-                }}
+                   );
+                  }}
                 onNavigateToSignup={() =>
                   handleNavigate(
                     'signup',
@@ -402,8 +406,15 @@ export default function App() {
                 }
               />
             )}
+            
 
-          </motion.div>
+{currentScreen === 'hr-dashboard' && (
+  <HRDashboard />
+)}
+
+</motion.div>
+
+          
 
         </AnimatePresence>
 
