@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { authenticatedFetch } from '../services/tokenAuth';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
@@ -515,7 +516,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     setAuditLogsLoading(true);
     setAuditLogsError('');
     try {
-      const response = await fetch(AUDIT_LOGS_API_URL, { signal });
+      const response = await authenticatedFetch(AUDIT_LOGS_API_URL, { signal });
       if (!response.ok) {
         throw new Error(`Failed to fetch audit logs (${response.status})`);
       }
@@ -747,7 +748,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     if (!endpoint || !setter) return;
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await authenticatedFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: value })
@@ -768,7 +769,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     }
   };
   useEffect(() => {
-  fetch('https://api.navapacksolutions.com/api/pipeline/')
+  authenticatedFetch('https://api.navapacksolutions.com/api/pipeline/')
     .then(response => {
       if (!response.ok) {
         throw new Error('Failed to fetch pipeline data');
@@ -825,7 +826,7 @@ useEffect(() => {
   ];
 
   masterEndpoints.forEach(({ url, setter }) => {
-    fetch(url)
+    authenticatedFetch(url)
       .then((response) => {
         if (!response.ok) {
           throw new Error(`Failed to fetch ${url}`);
@@ -842,7 +843,7 @@ useEffect(() => {
 }, []);
 // Daily Activity API
 useEffect(() => {
-  fetch(ACTIVITY_API_URL)
+  authenticatedFetch(ACTIVITY_API_URL)
     .then(response => {
       if (!response.ok) {
         throw new Error('Failed to fetch daily activities');
@@ -859,7 +860,7 @@ useEffect(() => {
 }, []);
 // Salesperson API
 useEffect(() => {
-  fetch(SALESPERSON_API_URL)
+  authenticatedFetch(SALESPERSON_API_URL)
     .then(response => {
       if (!response.ok) {
         throw new Error('Failed to fetch salespersons');
@@ -880,7 +881,7 @@ useEffect(() => {
 
 // Dashboard aggregate metrics API
 useEffect(() => {
-  fetch(DASHBOARD_METRICS_API_URL)
+  authenticatedFetch(DASHBOARD_METRICS_API_URL)
     .then(response => {
       if (!response.ok) {
         throw new Error(`Failed to fetch dashboard metrics (${response.status})`);
@@ -908,7 +909,7 @@ useEffect(() => {
 
   setWeeklyReportLoading(true);
   setWeeklyReportError('');
-  fetch(`${REPORTS_API_URL}?period=weekly&start_date=${weeklyStartDate}&end_date=${weeklyEndDate}`, {
+  authenticatedFetch(`${REPORTS_API_URL}?period=weekly&start_date=${weeklyStartDate}&end_date=${weeklyEndDate}`, {
     signal: controller.signal
   })
     .then(response => {
@@ -999,7 +1000,7 @@ useEffect(() => {
     const method = pipelineForm.id ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(apiUrl, {
+      const response = await authenticatedFetch(apiUrl, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -1046,7 +1047,7 @@ useEffect(() => {
       confirmLabel: 'Delete Record',
       onConfirm: async () => {
         try {
-          const response = await fetch(`${PIPELINE_API_URL}${id}/`, {
+          const response = await authenticatedFetch(`${PIPELINE_API_URL}${id}/`, {
             method: 'DELETE',
           });
 
@@ -1082,7 +1083,7 @@ useEffect(() => {
     const method = activityForm.id ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(apiUrl, {
+      const response = await authenticatedFetch(apiUrl, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -1129,7 +1130,7 @@ useEffect(() => {
       confirmLabel: 'Delete Log',
       onConfirm: async () => {
         try {
-          const response = await fetch(`${ACTIVITY_API_URL}${id}/`, {
+          const response = await authenticatedFetch(`${ACTIVITY_API_URL}${id}/`, {
             method: 'DELETE',
           });
 
@@ -1161,7 +1162,7 @@ useEffect(() => {
     const method = salespersonForm.id ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(apiUrl, {
+      const response = await authenticatedFetch(apiUrl, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -1225,7 +1226,7 @@ useEffect(() => {
       confirmLabel: 'Delete Salesperson',
       onConfirm: async () => {
         try {
-          const response = await fetch(`${SALESPERSON_API_URL}${id}/`, {
+          const response = await authenticatedFetch(`${SALESPERSON_API_URL}${id}/`, {
             method: 'DELETE',
           });
 

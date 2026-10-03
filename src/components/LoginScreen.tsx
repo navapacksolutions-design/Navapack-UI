@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authenticatedFetch, clearAuthToken, saveAuthToken } from '../services/tokenAuth';
 // Import the logo image directly from your assets folder:
 import logo from '../../assets/Nava-logo.png';
 
@@ -37,15 +38,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    const isMarketingLogin =
-      normalizedEmail === 'marketing@navapack.com' &&
-      password === 'Navapack@2026';
-
-    if (isMarketingLogin) {
-      onLogin({ email, role: 'marketing', department: 'marketing' });
-      setLoading(false);
-      return;
-    }
+    clearAuthToken();
 
     try {
       const response = await fetch(LOGIN_API_URL, {
@@ -76,12 +69,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
         return;
       }
 
+      if (typeof result.token !== 'string' || !result.token.trim()) {
+        setError('The login response did not include an authentication token. Please contact your administrator.');
+        return;
+      }
+      saveAuthToken(result.token.trim());
+
       // Base user info from the login response — login succeeds even if the
       // salesperson lookup below fails for any reason.
       let mergedUser: User = { ...(result.user || {}), email };
 
       try {
-        const salespersonsResponse = await fetch(SALESPERSONS_API_URL);
+        const salespersonsResponse = await authenticatedFetch(SALESPERSONS_API_URL);
 
         if (salespersonsResponse.ok) {
           const salespersonsPayload = await salespersonsResponse.json();
@@ -106,6 +105,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
         console.warn('Salesperson lookup failed:', lookupErr);
       }
 
+      if (normalizedEmail === 'marketing@navapack.com' && !mergedUser.department) {
+        mergedUser = { ...mergedUser, role: 'marketing', department: 'marketing' };
+      }
       onLogin(mergedUser);
     } catch (err) {
       setError('Something went wrong. Please check your backend connection.');
