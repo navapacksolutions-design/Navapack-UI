@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
-  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut
+  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut, History
 } from 'lucide-react';
 
 const INITIAL_SALESPERSONS = ['Pouline Bwogi', 'Rogers Wandera', 'Haidare Karrar', 'Salesperson 4'];
@@ -27,6 +27,7 @@ const ACTIVITY_TYPE_API_URL = 'https://api.navapacksolutions.com/api/activity-ty
 const UNIT_API_URL = 'https://api.navapacksolutions.com/api/units/';
 const DASHBOARD_METRICS_API_URL = 'https://api.navapacksolutions.com/api/dashboard-metrics/';
 const REPORTS_API_URL = 'https://api.navapacksolutions.com/api/reports/';
+const AUDIT_LOGS_API_URL = 'https://api.navapacksolutions.com/api/audit-logs/';
 
 const normalizeMasterOptionList = (items) =>
   Array.isArray(items)
@@ -498,10 +499,38 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [units, setUnits] = useState(['Pcs', 'Kg', 'Bags', 'Rolls', 'Boxes']);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [dashboardMetricsError, setDashboardMetricsError] = useState('');
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLogCount, setAuditLogCount] = useState(0);
+  const [auditLogsLoading, setAuditLogsLoading] = useState(false);
+  const [auditLogsError, setAuditLogsError] = useState('');
+  const [auditLogSearch, setAuditLogSearch] = useState('');
+  const [expandedAuditLogId, setExpandedAuditLogId] = useState(null);
   const [errorPopup, setErrorPopup] = useState('');
 
   const showErrorPopup = (error, fallbackMessage) => {
     setErrorPopup(error instanceof Error ? error.message : fallbackMessage);
+  };
+
+  const loadAuditLogs = async (signal) => {
+    setAuditLogsLoading(true);
+    setAuditLogsError('');
+    try {
+      const response = await fetch(AUDIT_LOGS_API_URL, { signal });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audit logs (${response.status})`);
+      }
+      const payload = await response.json();
+      const results = Array.isArray(payload) ? payload : payload?.results;
+      setAuditLogs(Array.isArray(results) ? results : []);
+      setAuditLogCount(Number(payload?.count ?? results?.length ?? 0));
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Error fetching audit logs:', error);
+        setAuditLogsError('Unable to load audit logs. Please try again.');
+      }
+    } finally {
+      if (!signal?.aborted) setAuditLogsLoading(false);
+    }
   };
 
   // Generic confirmation modal (replaces window.confirm)
@@ -866,6 +895,12 @@ useEffect(() => {
       console.error('Error fetching dashboard metrics:', error);
       setDashboardMetricsError('Live dashboard metrics are unavailable. Showing local data.');
     });
+}, []);
+
+useEffect(() => {
+  const controller = new AbortController();
+  loadAuditLogs(controller.signal);
+  return () => controller.abort();
 }, []);
 
 useEffect(() => {
@@ -1249,6 +1284,20 @@ useEffect(() => {
     ));
   }, [visibleActivityData, activitySearch]);
 
+  const filteredAuditLogs = useMemo(() => {
+    const query = auditLogSearch.trim().toLowerCase();
+    if (!query) return auditLogs;
+    return auditLogs.filter((entry) => [
+      entry.actor?.username,
+      entry.action,
+      entry.content_type,
+      entry.object_id,
+      entry.object_repr,
+      entry.remote_addr,
+      JSON.stringify(entry.changes || {})
+    ].some((value) => String(value ?? '').toLowerCase().includes(query)));
+  }, [auditLogs, auditLogSearch]);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
       {errorPopup && (
@@ -1339,6 +1388,20 @@ useEffect(() => {
             >
               <FileText className="w-4 h-4" />
               <span>Reports</span>
+            </button>
+            )}
+
+            {!isSalesUser && (
+            <button
+              onClick={() => setActiveTab('auditLogs')}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
+                activeTab === 'auditLogs'
+                  ? 'bg-sky-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span>Logs</span>
             </button>
             )}
 
@@ -2007,6 +2070,152 @@ useEffect(() => {
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {activeTab === 'auditLogs' && (
+            <div className="space-y-5">
+              <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Audit Logs</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {auditLogCount} {auditLogCount === 1 ? 'record' : 'records'}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <label className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={auditLogSearch}
+                      onChange={(event) => setAuditLogSearch(event.target.value)}
+                      placeholder="Search logs"
+                      className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:w-64"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => loadAuditLogs()}
+                    disabled={auditLogsLoading}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label="Refresh audit logs"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${auditLogsLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {auditLogsError && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">
+                  <span>{auditLogsError}</span>
+                  <button type="button" onClick={() => loadAuditLogs()} className="font-semibold underline">Try again</button>
+                </div>
+              )}
+
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+                    <thead className="border-b border-slate-200 bg-slate-100 text-xs font-bold uppercase text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3">Timestamp</th>
+                        <th className="px-4 py-3">Actor</th>
+                        <th className="px-4 py-3">Action</th>
+                        <th className="px-4 py-3">Record</th>
+                        <th className="px-4 py-3">Remote Address</th>
+                        <th className="px-4 py-3 text-right">Changes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {auditLogsLoading && auditLogs.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">Loading audit logs...</td></tr>
+                      )}
+                      {!auditLogsLoading && filteredAuditLogs.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                          {auditLogs.length ? 'No logs match your search.' : 'No audit logs found.'}
+                        </td></tr>
+                      )}
+                      {filteredAuditLogs.map((entry) => {
+                        const isExpanded = expandedAuditLogId === entry.id;
+                        const changes = Object.entries(entry.changes || {});
+                        const timestamp = entry.timestamp ? new Date(entry.timestamp) : null;
+                        return (
+                          <React.Fragment key={entry.id}>
+                            <tr className="align-top hover:bg-slate-50">
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                                {timestamp && !Number.isNaN(timestamp.getTime()) ? timestamp.toLocaleString() : entry.timestamp || '-'}
+                              </td>
+                              <td className="px-4 py-3 font-medium text-slate-800">
+                                {entry.actor?.username || 'System'}
+                                {entry.actor?.id != null && <span className="ml-1 text-xs text-slate-400">#{entry.actor.id}</span>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex rounded px-2 py-1 text-xs font-bold uppercase ${
+                                  entry.action === 'delete' ? 'bg-rose-100 text-rose-800' :
+                                  entry.action === 'create' ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'
+                                }`}>
+                                  {entry.action || 'unknown'}
+                                </span>
+                              </td>
+                              <td className="max-w-sm px-4 py-3">
+                                <div className="font-medium text-slate-800">{entry.object_repr || `${entry.content_type || 'Record'} #${entry.object_id ?? ''}`}</div>
+                                <div className="mt-1 text-xs text-slate-500">{entry.content_type || 'Unknown type'} · ID {entry.object_id ?? '-'}</div>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">{entry.remote_addr || '-'}</td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedAuditLogId(isExpanded ? null : entry.id)}
+                                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50"
+                                  aria-expanded={isExpanded}
+                                >
+                                  {changes.length} fields
+                                  <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </button>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr className="bg-slate-50">
+                                <td colSpan={6} className="px-4 py-4">
+                                  <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+                                    <span>Action code: {entry.action_code ?? '-'}</span>
+                                    <span>Log ID: {entry.id ?? '-'}</span>
+                                  </div>
+                                  {changes.length ? (
+                                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                      <table className="w-full min-w-[520px] text-left text-xs">
+                                        <thead className="bg-slate-100 font-bold text-slate-600">
+                                          <tr>
+                                            <th className="px-3 py-2">Field</th>
+                                            <th className="px-3 py-2">Previous value</th>
+                                            <th className="px-3 py-2">New value</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {changes.map(([field, values]) => (
+                                            <tr key={field}>
+                                              <td className="px-3 py-2 font-semibold text-slate-700">{field.replaceAll('_', ' ')}</td>
+                                              <td className="max-w-md break-words px-3 py-2 text-slate-600">{Array.isArray(values) ? String(values[0] ?? '-') : '-'}</td>
+                                              <td className="max-w-md break-words px-3 py-2 text-slate-600">{Array.isArray(values) ? String(values[1] ?? '-') : '-'}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : <p className="text-xs text-slate-500">No field changes recorded.</p>}
+                                  {entry.additional_data && (
+                                    <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{JSON.stringify(entry.additional_data, null, 2)}</pre>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 
@@ -2907,8 +3116,6 @@ useEffect(() => {
                 </div>
 
                 <div>
-<<<<<<< HEAD
-=======
                   <label className="block font-semibold text-slate-700 mb-1">Specific Location</label>
                   <input
                     type="text"
@@ -2939,17 +3146,12 @@ useEffect(() => {
                 </div>
 
                 <div>
->>>>>>> cb6a83f67b7b063317623fc7b10f5234c24eebce
                   <label className="block font-semibold text-slate-700 mb-1">Telephone</label>
                   <input
                     type="text"
                     value={activityForm.telephone}
                     onChange={(e) => setActivityForm({ ...activityForm, telephone: e.target.value })}
                     className="w-full border border-slate-300 rounded p-2"
-<<<<<<< HEAD
-                    placeholder="+256 7XX XXX XXX"
-=======
->>>>>>> cb6a83f67b7b063317623fc7b10f5234c24eebce
                   />
                 </div>
 
