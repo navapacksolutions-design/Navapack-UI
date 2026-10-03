@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { authenticatedFetch } from '../services/tokenAuth';
+import { ReportDownloadModal } from './ReportDownloadModal';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
@@ -640,6 +641,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [weeklyReport, setWeeklyReport] = useState(null);
   const [weeklyReportLoading, setWeeklyReportLoading] = useState(false);
   const [weeklyReportError, setWeeklyReportError] = useState('');
+  const [isReportDownloadOpen, setIsReportDownloadOpen] = useState(false);
 
   // Modal Controls
   const [isPipelineModalOpen, setIsPipelineModalOpen] = useState(false);
@@ -2231,6 +2233,9 @@ useEffect(() => {
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Executive Weekly Intelligence Report</h2>
                   <p className="text-xs text-slate-500">Consolidated weekly metrics, active deals, intel & bottleneck logs</p>
+                  <button type="button" onClick={() => setIsReportDownloadOpen(true)} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-2 focus-visible:outline-sky-600">
+                    <Download className="w-4 h-4" aria-hidden="true" /> Download Report
+                  </button>
                 </div>
                 <div className="flex items-center space-x-3 text-xs bg-slate-50 p-2 rounded-lg border border-slate-200">
                   <div className="flex items-center space-x-2">
@@ -2821,6 +2826,7 @@ useEffect(() => {
       {/* ======================================================== */}
 
       {/* PIPELINE ADD / EDIT MODAL */}
+      {isReportDownloadOpen && <ReportDownloadModal onClose={() => setIsReportDownloadOpen(false)} />}
       {isPipelineModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
