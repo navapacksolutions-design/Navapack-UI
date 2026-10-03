@@ -2905,6 +2905,17 @@ useEffect(() => {
                 </div>
 
                 <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Telephone</label>
+                  <input
+                    type="text"
+                    value={activityForm.telephone}
+                    onChange={(e) => setActivityForm({ ...activityForm, telephone: e.target.value })}
+                    className="w-full border border-slate-300 rounded p-2"
+                    placeholder="+256 7XX XXX XXX"
+                  />
+                </div>
+
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">Activity Type</label>
                   <select
                     value={activityForm.activityType}
