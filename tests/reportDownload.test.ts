@@ -2,6 +2,24 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 import { downloadReport, validateReportDates } from '../src/services/reportDownload';
+import { canEditSalesRecord, localDateString } from '../src/utils/salesRecordAccess';
+
+test('sales edits require own same-day pipeline or activity record', () => {
+  const today = '2026-10-03';
+  for (const field of ['dateAdded', 'date']) {
+    const record = { salesperson: ' Sales Person ', [field]: today };
+    assert.equal(canEditSalesRecord(true, record, 'sales person', today), true);
+    assert.equal(canEditSalesRecord(true, { ...record, [field]: '2026-10-02' }, 'sales person', today), false);
+    assert.equal(canEditSalesRecord(true, { ...record, [field]: '2026-10-04' }, 'sales person', today), false);
+    assert.equal(canEditSalesRecord(true, record, 'another person', today), false);
+    assert.equal(canEditSalesRecord(true, record, '', today), false);
+    assert.equal(canEditSalesRecord(true, record, 'sales person', '2026-10-04'), false);
+    assert.equal(canEditSalesRecord(false, { ...record, [field]: '2026-10-02' }, 'another person', today), true);
+  }
+  assert.equal(canEditSalesRecord(true, undefined, 'sales person', today), false);
+  assert.equal(canEditSalesRecord(true, { salesperson: 'sales person' }, 'sales person', today), false);
+  assert.equal(localDateString(new Date(2026, 9, 3, 0, 1)), today);
+});
 
 test('export validation, binary downloads, errors, authentication and retry', async () => {
   const storage = new Map([['navapack_token', 'existing-login-token']]);

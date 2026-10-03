@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { authenticatedFetch } from '../services/tokenAuth';
 import { ReportDownloadModal } from './ReportDownloadModal';
+import { canEditSalesRecord, localDateString } from '../utils/salesRecordAccess';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
@@ -489,6 +490,8 @@ const formatUGX = (amount) => {
 
 export default function App({ onLogout, department = 'marketing', user = {} }) {
   const isSalesUser = department.trim().toLowerCase() === 'sales';
+  const sameDayEditMessage = 'Sales users can only edit their own Customer Pipeline and Daily Activity records dated today.';
+  const canEditRecord = (record) => canEditSalesRecord(isSalesUser, record, user.name || '');
   const loggedInSalespersonName = user.name?.trim().toLowerCase() || '';
   const [activeTab, setActiveTab] = useState(isSalesUser ? 'pipeline' : 'dashboard');
   const [pipelineData, setPipelineData] = useState([]);
@@ -655,7 +658,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const emptyPipelineForm = {
     id: '',
     prospectId: '',
-    dateAdded: new Date().toISOString().split('T')[0],
+    dateAdded: localDateString(),
     salesperson: loggedInSalesperson,
     customer: '',
     location: '',
@@ -689,7 +692,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
 
   const emptyActivityForm = {
     id: '',
-    date: new Date().toISOString().split('T')[0],
+    date: localDateString(),
     salesperson: loggedInSalesperson,
     areaRoute: '',
     customer: '',
@@ -985,6 +988,10 @@ useEffect(() => {
 
   const handleSavePipeline = async (e) => {
     e.preventDefault();
+    if (pipelineForm.id && (!canEditRecord(pipelineData.find(item => item.id === pipelineForm.id)) || !canEditRecord(pipelineForm))) {
+      showErrorPopup(null, sameDayEditMessage);
+      return;
+    }
 
     const errors = validatePipelineForm(pipelineForm);
     setPipelineFormErrors(errors);
@@ -1035,6 +1042,10 @@ useEffect(() => {
   };
 
   const handleEditPipeline = (item) => {
+    if (!canEditRecord(item)) {
+      showErrorPopup(null, sameDayEditMessage);
+      return;
+    }
     setPipelineForm(item);
     setPipelineFormErrors({});
     setIsPipelineModalOpen(true);
@@ -1068,6 +1079,10 @@ useEffect(() => {
 
   const handleSaveActivity = async (e) => {
     e.preventDefault();
+    if (activityForm.id && (!canEditRecord(activityData.find(item => item.id === activityForm.id)) || !canEditRecord(activityForm))) {
+      showErrorPopup(null, sameDayEditMessage);
+      return;
+    }
 
     const errors = validateActivityForm(activityForm);
     setActivityFormErrors(errors);
@@ -1118,6 +1133,10 @@ useEffect(() => {
   };
 
   const handleEditActivity = (item) => {
+    if (!canEditRecord(item)) {
+      showErrorPopup(null, sameDayEditMessage);
+      return;
+    }
     setActivityForm(item);
     setActivityFormErrors({});
     setIsActivityModalOpen(true);
@@ -1729,8 +1748,10 @@ useEffect(() => {
                             </button>
                             <button
                               onClick={() => handleEditPipeline(item)}
-                              className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-amber-600"
-                              title="Edit Record"
+                              disabled={!canEditRecord(item)}
+                              className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={canEditRecord(item) ? 'Edit Record' : sameDayEditMessage}
+                              aria-label={canEditRecord(item) ? 'Edit Record' : sameDayEditMessage}
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -2016,8 +2037,10 @@ useEffect(() => {
                           <td className="p-2 border-r border-slate-200 sticky left-0 bg-white shadow-sm flex items-center space-x-1">
                             <button
                               onClick={() => handleEditActivity(log)}
-                              className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-amber-600"
-                              title="Edit Activity"
+                              disabled={!canEditRecord(log)}
+                              className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={canEditRecord(log) ? 'Edit Activity' : sameDayEditMessage}
+                              aria-label={canEditRecord(log) ? 'Edit Activity' : sameDayEditMessage}
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -3068,6 +3091,7 @@ useEffect(() => {
                   <input
                     type="date"
                     value={activityForm.date}
+                    disabled={isSalesUser && Boolean(activityForm.id)}
                     onChange={(e) => {
                       setActivityForm({ ...activityForm, date: e.target.value });
                       if (activityFormErrors.date) setActivityFormErrors({ ...activityFormErrors, date: undefined });
