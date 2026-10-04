@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import navapackLogo from '../assets/Nava-logo.png';
 import { authenticatedFetch } from '../services/tokenAuth';
 import { ReportDownloadModal } from './ReportDownloadModal';
 import { canEditSalesRecord, localDateString } from '../utils/salesRecordAccess';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
-  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut, History
+  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut, History, Menu, X
 } from 'lucide-react';
 
 const INITIAL_SALESPERSONS = ['Pouline Bwogi', 'Rogers Wandera', 'Haidare Karrar', 'Salesperson 4'];
@@ -494,6 +495,11 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const canEditRecord = (record) => canEditSalesRecord(isSalesUser, record, user.name || '');
   const loggedInSalespersonName = user.name?.trim().toLowerCase() || '';
   const [activeTab, setActiveTab] = useState(isSalesUser ? 'pipeline' : 'dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const selectTab = (tab) => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
+  };
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
   const [salespersonData, setSalespersonData] = useState([]);
@@ -1345,12 +1351,34 @@ useEffect(() => {
       <div className="flex-1 w-full px-6 lg:px-8 xl:px-10 py-8 flex flex-col lg:flex-row gap-8">
         
         {/* Navigation Sidebar Tabs */}
-        <nav className="w-full lg:w-72 flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 self-start sticky top-20">
+        <button
+          type="button"
+          onClick={() => setIsMobileMenuOpen((open) => !open)}
+          aria-expanded={isMobileMenuOpen}
+          aria-controls="marketing-navigation"
+          aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          className="lg:hidden flex items-center gap-3 self-start rounded-lg border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 shadow-sm"
+        >
+          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          <span>Menu</span>
+        </button>
+        <nav
+          id="marketing-navigation"
+          aria-label="Marketing navigation"
+          className={`${isMobileMenuOpen ? 'block' : 'hidden'} lg:block w-full lg:w-72 flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 self-start lg:sticky lg:top-20`}
+        >
+          <div className="mb-3 flex justify-center border-b border-slate-100 pb-4">
+            <img
+              src={navapackLogo}
+              alt="Navapack Solutions logo"
+              className="h-20 w-44 object-contain"
+            />
+          </div>
           <div className="text-sm font-semibold text-slate-400 uppercase px-3 py-2">Navigation Menu</div>
           <div className="space-y-1">
             {!isSalesUser && (
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => selectTab('dashboard')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'dashboard'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1363,7 +1391,7 @@ useEffect(() => {
             )}
 
             <button
-              onClick={() => setActiveTab('pipeline')}
+              onClick={() => selectTab('pipeline')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'pipeline'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1375,7 +1403,7 @@ useEffect(() => {
             </button>
             {!isSalesUser && (
                         <button
-              onClick={() => setActiveTab('salesperson')}
+              onClick={() => selectTab('salesperson')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'salesperson'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1388,7 +1416,7 @@ useEffect(() => {
             )}
 
             <button
-              onClick={() => setActiveTab('activity')}
+              onClick={() => selectTab('activity')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'activity'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1401,7 +1429,7 @@ useEffect(() => {
 
             {!isSalesUser && (
             <button
-              onClick={() => setActiveTab('weekly')}
+              onClick={() => selectTab('weekly')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'weekly'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1415,7 +1443,7 @@ useEffect(() => {
 
             {!isSalesUser && (
             <button
-              onClick={() => setActiveTab('auditLogs')}
+              onClick={() => selectTab('auditLogs')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'auditLogs'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1429,7 +1457,7 @@ useEffect(() => {
 
             {!isSalesUser && (
             <button
-              onClick={() => setActiveTab('lists')}
+              onClick={() => selectTab('lists')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'lists'
                   ? 'bg-sky-600 text-white shadow-sm'
