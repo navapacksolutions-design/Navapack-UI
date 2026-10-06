@@ -22,6 +22,7 @@ import { WhatsAppButton } from './components/WhatsAppButton';
 import { Dashboard } from './components/Dashboard';
 import MarketingDashboard from './components/marketing_dashbrod.jsx';
 import { HRDashboard } from './components/hr_dashboard';
+import { clearAuthToken } from './services/tokenAuth';
 
 export default function App() {
   // Get current screen from URL
@@ -398,6 +399,7 @@ export default function App() {
                     setLoggedInUser({});
                     sessionStorage.removeItem('navapack_department');
                     sessionStorage.removeItem('navapack_user');
+                    clearAuthToken();
                     handleNavigate(
                       'login',
                       'push_back'

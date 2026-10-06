@@ -1,8 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import navapackLogo from '../assets/Nava-logo.png';
+import { authenticatedFetch } from '../services/tokenAuth';
+import { ReportDownloadModal } from './ReportDownloadModal';
+import { canEditSalesRecord, localDateString } from '../utils/salesRecordAccess';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
-  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut
+  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut, History, Menu, X
 } from 'lucide-react';
 
 const INITIAL_SALESPERSONS = ['Pouline Bwogi', 'Rogers Wandera', 'Haidare Karrar', 'Salesperson 4'];
@@ -27,6 +31,7 @@ const ACTIVITY_TYPE_API_URL = 'https://api.navapacksolutions.com/api/activity-ty
 const UNIT_API_URL = 'https://api.navapacksolutions.com/api/units/';
 const DASHBOARD_METRICS_API_URL = 'https://api.navapacksolutions.com/api/dashboard-metrics/';
 const REPORTS_API_URL = 'https://api.navapacksolutions.com/api/reports/';
+const AUDIT_LOGS_API_URL = 'https://api.navapacksolutions.com/api/audit-logs/';
 
 const normalizeMasterOptionList = (items) =>
   Array.isArray(items)
@@ -122,13 +127,14 @@ const normalizePipelineRecord = (item, fallbackId) => ({
   salesperson: item?.salesperson_detail?.name || item?.salesperson || '',
   customer: item?.customer_company || '',
   location: item?.location_town || '',
+  email: item?.email || '',
   contactPerson: item?.contact_person || '',
   telephone: item?.telephone || '',
   customerType: item?.customer_type || '',
   product: item?.product_service || '',
   specs: item?.requirement_specifications || '',
   estQty: item?.estimated_quantity || '',
-  unit: item?.unit || 'Pcs',
+  unit: item?.unit === 'Bags' ? 'CTR' : item?.unit || 'Pcs',
   estValue: Number(item?.estimated_value_ugx || 0),
   lastContactDate: item?.last_contact_date || '',
   lastDiscussion: item?.last_discussion_feedback || '',
@@ -486,8 +492,15 @@ const formatUGX = (amount) => {
 
 export default function App({ onLogout, department = 'marketing', user = {} }) {
   const isSalesUser = department.trim().toLowerCase() === 'sales';
+  const sameDayEditMessage = 'Sales users can only edit their own Customer Pipeline and Daily Activity records dated today.';
+  const canEditRecord = (record) => canEditSalesRecord(isSalesUser, record, user.name || '');
   const loggedInSalespersonName = user.name?.trim().toLowerCase() || '';
   const [activeTab, setActiveTab] = useState(isSalesUser ? 'pipeline' : 'dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const selectTab = (tab) => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
+  };
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
   const [salespersonData, setSalespersonData] = useState([]);
@@ -495,13 +508,41 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [productServices, setProductServices] = useState(INITIAL_PRODUCTS);
   const [salesStages, setSalesStages] = useState(INITIAL_SALES_STAGES);
   const [activityTypes, setActivityTypes] = useState(['Physical Visit', 'Follow-up Interaction', 'Phone Call', 'Email Quote']);
-  const [units, setUnits] = useState(['Pcs', 'Kg', 'Bags', 'Rolls', 'Boxes']);
+  const [units, setUnits] = useState(['Pcs', 'Kg', 'CTR', 'Rolls', 'Boxes']);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [dashboardMetricsError, setDashboardMetricsError] = useState('');
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLogCount, setAuditLogCount] = useState(0);
+  const [auditLogsLoading, setAuditLogsLoading] = useState(false);
+  const [auditLogsError, setAuditLogsError] = useState('');
+  const [auditLogSearch, setAuditLogSearch] = useState('');
+  const [expandedAuditLogId, setExpandedAuditLogId] = useState(null);
   const [errorPopup, setErrorPopup] = useState('');
 
   const showErrorPopup = (error, fallbackMessage) => {
     setErrorPopup(error instanceof Error ? error.message : fallbackMessage);
+  };
+
+  const loadAuditLogs = async (signal) => {
+    setAuditLogsLoading(true);
+    setAuditLogsError('');
+    try {
+      const response = await authenticatedFetch(AUDIT_LOGS_API_URL, { signal });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audit logs (${response.status})`);
+      }
+      const payload = await response.json();
+      const results = Array.isArray(payload) ? payload : payload?.results;
+      setAuditLogs(Array.isArray(results) ? results : []);
+      setAuditLogCount(Number(payload?.count ?? results?.length ?? 0));
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Error fetching audit logs:', error);
+        setAuditLogsError('Unable to load audit logs. Please try again.');
+      }
+    } finally {
+      if (!signal?.aborted) setAuditLogsLoading(false);
+    }
   };
 
   // Generic confirmation modal (replaces window.confirm)
@@ -541,6 +582,10 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     const errors = {};
     if (!form.salesperson || !form.salesperson.trim()) errors.salesperson = 'Salesperson is required.';
     if (!form.customer || !form.customer.trim()) errors.customer = 'Customer / Company is required.';
+    if (!form.location || !form.location.trim()) errors.location = 'Location / Town is required.';
+    if (!form.email || !form.email.trim()) errors.email = 'Mail ID is required.';
+    else if (!EMAIL_REGEX.test(form.email.trim())) errors.email = 'Enter a valid email address.';
+    if (!form.nextFollowUpDate) errors.nextFollowUpDate = 'Next Follow-up Date is required.';
     if (form.telephone && !PHONE_REGEX.test(form.telephone.trim())) {
       errors.telephone = 'Enter a valid phone number.';
     }
@@ -610,6 +655,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [weeklyReport, setWeeklyReport] = useState(null);
   const [weeklyReportLoading, setWeeklyReportLoading] = useState(false);
   const [weeklyReportError, setWeeklyReportError] = useState('');
+  const [isReportDownloadOpen, setIsReportDownloadOpen] = useState(false);
 
   // Modal Controls
   const [isPipelineModalOpen, setIsPipelineModalOpen] = useState(false);
@@ -623,10 +669,11 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const emptyPipelineForm = {
     id: '',
     prospectId: '',
-    dateAdded: new Date().toISOString().split('T')[0],
+    dateAdded: localDateString(),
     salesperson: loggedInSalesperson,
     customer: '',
     location: '',
+    email: '',
     contactPerson: '',
     telephone: '',
     customerType: customerTypes[0],
@@ -657,7 +704,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
 
   const emptyActivityForm = {
     id: '',
-    date: new Date().toISOString().split('T')[0],
+    date: localDateString(),
     salesperson: loggedInSalesperson,
     areaRoute: '',
     customer: '',
@@ -718,7 +765,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     if (!endpoint || !setter) return;
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await authenticatedFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: value })
@@ -739,7 +786,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     }
   };
   useEffect(() => {
-  fetch('https://api.navapacksolutions.com/api/pipeline/')
+  authenticatedFetch('https://api.navapacksolutions.com/api/pipeline/')
     .then(response => {
       if (!response.ok) {
         throw new Error('Failed to fetch pipeline data');
@@ -796,7 +843,7 @@ useEffect(() => {
   ];
 
   masterEndpoints.forEach(({ url, setter }) => {
-    fetch(url)
+    authenticatedFetch(url)
       .then((response) => {
         if (!response.ok) {
           throw new Error(`Failed to fetch ${url}`);
@@ -813,7 +860,7 @@ useEffect(() => {
 }, []);
 // Daily Activity API
 useEffect(() => {
-  fetch(ACTIVITY_API_URL)
+  authenticatedFetch(ACTIVITY_API_URL)
     .then(response => {
       if (!response.ok) {
         throw new Error('Failed to fetch daily activities');
@@ -830,7 +877,7 @@ useEffect(() => {
 }, []);
 // Salesperson API
 useEffect(() => {
-  fetch(SALESPERSON_API_URL)
+  authenticatedFetch(SALESPERSON_API_URL)
     .then(response => {
       if (!response.ok) {
         throw new Error('Failed to fetch salespersons');
@@ -851,7 +898,7 @@ useEffect(() => {
 
 // Dashboard aggregate metrics API
 useEffect(() => {
-  fetch(DASHBOARD_METRICS_API_URL)
+  authenticatedFetch(DASHBOARD_METRICS_API_URL)
     .then(response => {
       if (!response.ok) {
         throw new Error(`Failed to fetch dashboard metrics (${response.status})`);
@@ -870,10 +917,16 @@ useEffect(() => {
 
 useEffect(() => {
   const controller = new AbortController();
+  loadAuditLogs(controller.signal);
+  return () => controller.abort();
+}, []);
+
+useEffect(() => {
+  const controller = new AbortController();
 
   setWeeklyReportLoading(true);
   setWeeklyReportError('');
-  fetch(`${REPORTS_API_URL}?period=weekly&start_date=${weeklyStartDate}&end_date=${weeklyEndDate}`, {
+  authenticatedFetch(`${REPORTS_API_URL}?period=weekly&start_date=${weeklyStartDate}&end_date=${weeklyEndDate}`, {
     signal: controller.signal
   })
     .then(response => {
@@ -947,6 +1000,10 @@ useEffect(() => {
 
   const handleSavePipeline = async (e) => {
     e.preventDefault();
+    if (pipelineForm.id && (!canEditRecord(pipelineData.find(item => item.id === pipelineForm.id)) || !canEditRecord(pipelineForm))) {
+      showErrorPopup(null, sameDayEditMessage);
+      return;
+    }
 
     const errors = validatePipelineForm(pipelineForm);
     setPipelineFormErrors(errors);
@@ -964,7 +1021,7 @@ useEffect(() => {
     const method = pipelineForm.id ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(apiUrl, {
+      const response = await authenticatedFetch(apiUrl, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -997,6 +1054,10 @@ useEffect(() => {
   };
 
   const handleEditPipeline = (item) => {
+    if (!canEditRecord(item)) {
+      showErrorPopup(null, sameDayEditMessage);
+      return;
+    }
     setPipelineForm(item);
     setPipelineFormErrors({});
     setIsPipelineModalOpen(true);
@@ -1011,7 +1072,7 @@ useEffect(() => {
       confirmLabel: 'Delete Record',
       onConfirm: async () => {
         try {
-          const response = await fetch(`${PIPELINE_API_URL}${id}/`, {
+          const response = await authenticatedFetch(`${PIPELINE_API_URL}${id}/`, {
             method: 'DELETE',
           });
 
@@ -1030,6 +1091,10 @@ useEffect(() => {
 
   const handleSaveActivity = async (e) => {
     e.preventDefault();
+    if (activityForm.id && (!canEditRecord(activityData.find(item => item.id === activityForm.id)) || !canEditRecord(activityForm))) {
+      showErrorPopup(null, sameDayEditMessage);
+      return;
+    }
 
     const errors = validateActivityForm(activityForm);
     setActivityFormErrors(errors);
@@ -1047,7 +1112,7 @@ useEffect(() => {
     const method = activityForm.id ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(apiUrl, {
+      const response = await authenticatedFetch(apiUrl, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -1080,6 +1145,10 @@ useEffect(() => {
   };
 
   const handleEditActivity = (item) => {
+    if (!canEditRecord(item)) {
+      showErrorPopup(null, sameDayEditMessage);
+      return;
+    }
     setActivityForm(item);
     setActivityFormErrors({});
     setIsActivityModalOpen(true);
@@ -1094,7 +1163,7 @@ useEffect(() => {
       confirmLabel: 'Delete Log',
       onConfirm: async () => {
         try {
-          const response = await fetch(`${ACTIVITY_API_URL}${id}/`, {
+          const response = await authenticatedFetch(`${ACTIVITY_API_URL}${id}/`, {
             method: 'DELETE',
           });
 
@@ -1126,7 +1195,7 @@ useEffect(() => {
     const method = salespersonForm.id ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(apiUrl, {
+      const response = await authenticatedFetch(apiUrl, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -1190,7 +1259,7 @@ useEffect(() => {
       confirmLabel: 'Delete Salesperson',
       onConfirm: async () => {
         try {
-          const response = await fetch(`${SALESPERSON_API_URL}${id}/`, {
+          const response = await authenticatedFetch(`${SALESPERSON_API_URL}${id}/`, {
             method: 'DELETE',
           });
 
@@ -1249,6 +1318,20 @@ useEffect(() => {
     ));
   }, [visibleActivityData, activitySearch]);
 
+  const filteredAuditLogs = useMemo(() => {
+    const query = auditLogSearch.trim().toLowerCase();
+    if (!query) return auditLogs;
+    return auditLogs.filter((entry) => [
+      entry.actor?.username,
+      entry.action,
+      entry.content_type,
+      entry.object_id,
+      entry.object_repr,
+      entry.remote_addr,
+      JSON.stringify(entry.changes || {})
+    ].some((value) => String(value ?? '').toLowerCase().includes(query)));
+  }, [auditLogs, auditLogSearch]);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
       {errorPopup && (
@@ -1274,12 +1357,34 @@ useEffect(() => {
       <div className="flex-1 w-full px-6 lg:px-8 xl:px-10 py-8 flex flex-col lg:flex-row gap-8">
         
         {/* Navigation Sidebar Tabs */}
-        <nav className="w-full lg:w-72 flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 self-start sticky top-20">
+        <button
+          type="button"
+          onClick={() => setIsMobileMenuOpen((open) => !open)}
+          aria-expanded={isMobileMenuOpen}
+          aria-controls="marketing-navigation"
+          aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          className="lg:hidden flex items-center gap-3 self-start rounded-lg border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 shadow-sm"
+        >
+          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          <span>Menu</span>
+        </button>
+        <nav
+          id="marketing-navigation"
+          aria-label="Marketing navigation"
+          className={`${isMobileMenuOpen ? 'block' : 'hidden'} lg:block w-full lg:w-72 flex-shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 self-start lg:sticky lg:top-20`}
+        >
+          <div className="mb-3 flex justify-center border-b border-slate-100 pb-4">
+            <img
+              src={navapackLogo}
+              alt="Navapack Solutions logo"
+              className="h-20 w-44 object-contain"
+            />
+          </div>
           <div className="text-sm font-semibold text-slate-400 uppercase px-3 py-2">Navigation Menu</div>
           <div className="space-y-1">
             {!isSalesUser && (
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => selectTab('dashboard')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'dashboard'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1292,7 +1397,7 @@ useEffect(() => {
             )}
 
             <button
-              onClick={() => setActiveTab('pipeline')}
+              onClick={() => selectTab('pipeline')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'pipeline'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1304,7 +1409,7 @@ useEffect(() => {
             </button>
             {!isSalesUser && (
                         <button
-              onClick={() => setActiveTab('salesperson')}
+              onClick={() => selectTab('salesperson')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'salesperson'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1317,7 +1422,7 @@ useEffect(() => {
             )}
 
             <button
-              onClick={() => setActiveTab('activity')}
+              onClick={() => selectTab('activity')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'activity'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1330,7 +1435,7 @@ useEffect(() => {
 
             {!isSalesUser && (
             <button
-              onClick={() => setActiveTab('weekly')}
+              onClick={() => selectTab('weekly')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'weekly'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1344,7 +1449,21 @@ useEffect(() => {
 
             {!isSalesUser && (
             <button
-              onClick={() => setActiveTab('lists')}
+              onClick={() => selectTab('auditLogs')}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
+                activeTab === 'auditLogs'
+                  ? 'bg-sky-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span>Logs</span>
+            </button>
+            )}
+
+            {!isSalesUser && (
+            <button
+              onClick={() => selectTab('lists')}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-base font-medium transition-all ${
                 activeTab === 'lists'
                   ? 'bg-sky-600 text-white shadow-sm'
@@ -1663,8 +1782,10 @@ useEffect(() => {
                             </button>
                             <button
                               onClick={() => handleEditPipeline(item)}
-                              className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-amber-600"
-                              title="Edit Record"
+                              disabled={!canEditRecord(item)}
+                              className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={canEditRecord(item) ? 'Edit Record' : sameDayEditMessage}
+                              aria-label={canEditRecord(item) ? 'Edit Record' : sameDayEditMessage}
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -1950,8 +2071,10 @@ useEffect(() => {
                           <td className="p-2 border-r border-slate-200 sticky left-0 bg-white shadow-sm flex items-center space-x-1">
                             <button
                               onClick={() => handleEditActivity(log)}
-                              className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-amber-600"
-                              title="Edit Activity"
+                              disabled={!canEditRecord(log)}
+                              className="p-1 hover:bg-slate-100 rounded text-slate-600 hover:text-amber-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={canEditRecord(log) ? 'Edit Activity' : sameDayEditMessage}
+                              aria-label={canEditRecord(log) ? 'Edit Activity' : sameDayEditMessage}
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -2010,6 +2133,152 @@ useEffect(() => {
             </div>
           )}
 
+          {activeTab === 'auditLogs' && (
+            <div className="space-y-5">
+              <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Audit Logs</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {auditLogCount} {auditLogCount === 1 ? 'record' : 'records'}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <label className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={auditLogSearch}
+                      onChange={(event) => setAuditLogSearch(event.target.value)}
+                      placeholder="Search logs"
+                      className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100 sm:w-64"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => loadAuditLogs()}
+                    disabled={auditLogsLoading}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label="Refresh audit logs"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${auditLogsLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {auditLogsError && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">
+                  <span>{auditLogsError}</span>
+                  <button type="button" onClick={() => loadAuditLogs()} className="font-semibold underline">Try again</button>
+                </div>
+              )}
+
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+                    <thead className="border-b border-slate-200 bg-slate-100 text-xs font-bold uppercase text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3">Timestamp</th>
+                        <th className="px-4 py-3">Actor</th>
+                        <th className="px-4 py-3">Action</th>
+                        <th className="px-4 py-3">Record</th>
+                        <th className="px-4 py-3">Remote Address</th>
+                        <th className="px-4 py-3 text-right">Changes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {auditLogsLoading && auditLogs.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">Loading audit logs...</td></tr>
+                      )}
+                      {!auditLogsLoading && filteredAuditLogs.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                          {auditLogs.length ? 'No logs match your search.' : 'No audit logs found.'}
+                        </td></tr>
+                      )}
+                      {filteredAuditLogs.map((entry) => {
+                        const isExpanded = expandedAuditLogId === entry.id;
+                        const changes = Object.entries(entry.changes || {});
+                        const timestamp = entry.timestamp ? new Date(entry.timestamp) : null;
+                        return (
+                          <React.Fragment key={entry.id}>
+                            <tr className="align-top hover:bg-slate-50">
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                                {timestamp && !Number.isNaN(timestamp.getTime()) ? timestamp.toLocaleString() : entry.timestamp || '-'}
+                              </td>
+                              <td className="px-4 py-3 font-medium text-slate-800">
+                                {entry.actor?.username || 'System'}
+                                {entry.actor?.id != null && <span className="ml-1 text-xs text-slate-400">#{entry.actor.id}</span>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex rounded px-2 py-1 text-xs font-bold uppercase ${
+                                  entry.action === 'delete' ? 'bg-rose-100 text-rose-800' :
+                                  entry.action === 'create' ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800'
+                                }`}>
+                                  {entry.action || 'unknown'}
+                                </span>
+                              </td>
+                              <td className="max-w-sm px-4 py-3">
+                                <div className="font-medium text-slate-800">{entry.object_repr || `${entry.content_type || 'Record'} #${entry.object_id ?? ''}`}</div>
+                                <div className="mt-1 text-xs text-slate-500">{entry.content_type || 'Unknown type'} · ID {entry.object_id ?? '-'}</div>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">{entry.remote_addr || '-'}</td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedAuditLogId(isExpanded ? null : entry.id)}
+                                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50"
+                                  aria-expanded={isExpanded}
+                                >
+                                  {changes.length} fields
+                                  <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </button>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr className="bg-slate-50">
+                                <td colSpan={6} className="px-4 py-4">
+                                  <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+                                    <span>Action code: {entry.action_code ?? '-'}</span>
+                                    <span>Log ID: {entry.id ?? '-'}</span>
+                                  </div>
+                                  {changes.length ? (
+                                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                      <table className="w-full min-w-[520px] text-left text-xs">
+                                        <thead className="bg-slate-100 font-bold text-slate-600">
+                                          <tr>
+                                            <th className="px-3 py-2">Field</th>
+                                            <th className="px-3 py-2">Previous value</th>
+                                            <th className="px-3 py-2">New value</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {changes.map(([field, values]) => (
+                                            <tr key={field}>
+                                              <td className="px-3 py-2 font-semibold text-slate-700">{field.replaceAll('_', ' ')}</td>
+                                              <td className="max-w-md break-words px-3 py-2 text-slate-600">{Array.isArray(values) ? String(values[0] ?? '-') : '-'}</td>
+                                              <td className="max-w-md break-words px-3 py-2 text-slate-600">{Array.isArray(values) ? String(values[1] ?? '-') : '-'}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : <p className="text-xs text-slate-500">No field changes recorded.</p>}
+                                  {entry.additional_data && (
+                                    <pre className="mt-3 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{JSON.stringify(entry.additional_data, null, 2)}</pre>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ======================================================== */}
           {/* TAB 4: WEEKLY REPORT (5 Key Executive Sections)           */}
           {/* ======================================================== */}
@@ -2021,6 +2290,9 @@ useEffect(() => {
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Executive Weekly Intelligence Report</h2>
                   <p className="text-xs text-slate-500">Consolidated weekly metrics, active deals, intel & bottleneck logs</p>
+                  <button type="button" onClick={() => setIsReportDownloadOpen(true)} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-2 focus-visible:outline-sky-600">
+                    <Download className="w-4 h-4" aria-hidden="true" /> Download Report
+                  </button>
                 </div>
                 <div className="flex items-center space-x-3 text-xs bg-slate-50 p-2 rounded-lg border border-slate-200">
                   <div className="flex items-center space-x-2">
@@ -2611,6 +2883,7 @@ useEffect(() => {
       {/* ======================================================== */}
 
       {/* PIPELINE ADD / EDIT MODAL */}
+      {isReportDownloadOpen && <ReportDownloadModal onClose={() => setIsReportDownloadOpen(false)} />}
       {isPipelineModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -2659,13 +2932,36 @@ useEffect(() => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Location / Town</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Location / Town *</label>
                   <input
                     type="text"
                     value={pipelineForm.location}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, location: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, location: e.target.value });
+                      if (pipelineFormErrors.location) setPipelineFormErrors({ ...pipelineFormErrors, location: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.location)}`}
                   />
+                  {pipelineFormErrors.location && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.location}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Mail ID *</label>
+                  <input
+                    type="email"
+                    value={pipelineForm.email}
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, email: e.target.value });
+                      if (pipelineFormErrors.email) setPipelineFormErrors({ ...pipelineFormErrors, email: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.email)}`}
+                    placeholder="customer@example.com"
+                  />
+                  {pipelineFormErrors.email && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2724,8 +3020,8 @@ useEffect(() => {
                     onChange={(e) => setPipelineForm({ ...pipelineForm, unit: e.target.value })}
                     className="w-full border border-slate-300 rounded p-2"
                   >
-                    {(units.length ? units : ['Pcs', 'Kg', 'Bags', 'Rolls', 'Boxes']).map(unit => (
-                      <option key={unit} value={unit}>{unit}</option>
+                    {(units.length ? units : ['Pcs', 'Kg', 'CTR', 'Rolls', 'Boxes']).map(unit => (
+                      <option key={unit} value={unit === 'Bags' ? 'CTR' : unit}>{unit === 'Bags' ? 'CTR' : unit}</option>
                     ))}
                   </select>
                 </div>
@@ -2769,13 +3065,19 @@ useEffect(() => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Next Follow-up Date</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Next Follow-up Date *</label>
                   <input
                     type="date"
                     value={pipelineForm.nextFollowUpDate}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, nextFollowUpDate: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, nextFollowUpDate: e.target.value });
+                      if (pipelineFormErrors.nextFollowUpDate) setPipelineFormErrors({ ...pipelineFormErrors, nextFollowUpDate: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.nextFollowUpDate)}`}
                   />
+                  {pipelineFormErrors.nextFollowUpDate && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.nextFollowUpDate}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2852,6 +3154,7 @@ useEffect(() => {
                   <input
                     type="date"
                     value={activityForm.date}
+                    disabled={isSalesUser && Boolean(activityForm.id)}
                     onChange={(e) => {
                       setActivityForm({ ...activityForm, date: e.target.value });
                       if (activityFormErrors.date) setActivityFormErrors({ ...activityFormErrors, date: undefined });
