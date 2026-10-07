@@ -108,7 +108,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
       if (normalizedEmail === 'marketing@navapack.com' && !mergedUser.department) {
         mergedUser = { ...mergedUser, role: 'marketing', department: 'marketing' };
       }
-      if (normalizedEmail === 'pouline01@navapack.com' && !mergedUser.department) {
+      if (
+        [
+          'pouline01@navapack.com',
+          'haidare01@navpack.com',
+          'rogers01@navapack.com',
+        ].includes(normalizedEmail) &&
+        !mergedUser.department
+      ) {
         mergedUser = { ...mergedUser, department: 'sales' };
       }
       onLogin(mergedUser);
