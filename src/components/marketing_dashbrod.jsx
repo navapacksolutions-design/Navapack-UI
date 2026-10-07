@@ -127,13 +127,14 @@ const normalizePipelineRecord = (item, fallbackId) => ({
   salesperson: item?.salesperson_detail?.name || item?.salesperson || '',
   customer: item?.customer_company || '',
   location: item?.location_town || '',
+  email: item?.email || '',
   contactPerson: item?.contact_person || '',
   telephone: item?.telephone || '',
   customerType: item?.customer_type || '',
   product: item?.product_service || '',
   specs: item?.requirement_specifications || '',
   estQty: item?.estimated_quantity || '',
-  unit: item?.unit || 'Pcs',
+  unit: item?.unit === 'Bags' ? 'CTR' : item?.unit || 'Pcs',
   estValue: Number(item?.estimated_value_ugx || 0),
   lastContactDate: item?.last_contact_date || '',
   lastDiscussion: item?.last_discussion_feedback || '',
@@ -507,7 +508,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [productServices, setProductServices] = useState(INITIAL_PRODUCTS);
   const [salesStages, setSalesStages] = useState(INITIAL_SALES_STAGES);
   const [activityTypes, setActivityTypes] = useState(['Physical Visit', 'Follow-up Interaction', 'Phone Call', 'Email Quote']);
-  const [units, setUnits] = useState(['Pcs', 'Kg', 'Bags', 'Rolls', 'Boxes']);
+  const [units, setUnits] = useState(['Pcs', 'Kg', 'CTR', 'Rolls', 'Boxes']);
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
   const [dashboardMetricsError, setDashboardMetricsError] = useState('');
   const [auditLogs, setAuditLogs] = useState([]);
@@ -581,6 +582,10 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     const errors = {};
     if (!form.salesperson || !form.salesperson.trim()) errors.salesperson = 'Salesperson is required.';
     if (!form.customer || !form.customer.trim()) errors.customer = 'Customer / Company is required.';
+    if (!form.location || !form.location.trim()) errors.location = 'Location / Town is required.';
+    if (!form.email || !form.email.trim()) errors.email = 'Mail ID is required.';
+    else if (!EMAIL_REGEX.test(form.email.trim())) errors.email = 'Enter a valid email address.';
+    if (!form.nextFollowUpDate) errors.nextFollowUpDate = 'Next Follow-up Date is required.';
     if (form.telephone && !PHONE_REGEX.test(form.telephone.trim())) {
       errors.telephone = 'Enter a valid phone number.';
     }
@@ -668,6 +673,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     salesperson: loggedInSalesperson,
     customer: '',
     location: '',
+    email: '',
     contactPerson: '',
     telephone: '',
     customerType: customerTypes[0],
@@ -2926,13 +2932,36 @@ useEffect(() => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Location / Town</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Location / Town *</label>
                   <input
                     type="text"
                     value={pipelineForm.location}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, location: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, location: e.target.value });
+                      if (pipelineFormErrors.location) setPipelineFormErrors({ ...pipelineFormErrors, location: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.location)}`}
                   />
+                  {pipelineFormErrors.location && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.location}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Mail ID *</label>
+                  <input
+                    type="email"
+                    value={pipelineForm.email}
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, email: e.target.value });
+                      if (pipelineFormErrors.email) setPipelineFormErrors({ ...pipelineFormErrors, email: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.email)}`}
+                    placeholder="customer@example.com"
+                  />
+                  {pipelineFormErrors.email && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
@@ -2991,8 +3020,8 @@ useEffect(() => {
                     onChange={(e) => setPipelineForm({ ...pipelineForm, unit: e.target.value })}
                     className="w-full border border-slate-300 rounded p-2"
                   >
-                    {(units.length ? units : ['Pcs', 'Kg', 'Bags', 'Rolls', 'Boxes']).map(unit => (
-                      <option key={unit} value={unit}>{unit}</option>
+                    {(units.length ? units : ['Pcs', 'Kg', 'CTR', 'Rolls', 'Boxes']).map(unit => (
+                      <option key={unit} value={unit === 'Bags' ? 'CTR' : unit}>{unit === 'Bags' ? 'CTR' : unit}</option>
                     ))}
                   </select>
                 </div>
@@ -3036,13 +3065,19 @@ useEffect(() => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Next Follow-up Date</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Next Follow-up Date *</label>
                   <input
                     type="date"
                     value={pipelineForm.nextFollowUpDate}
-                    onChange={(e) => setPipelineForm({ ...pipelineForm, nextFollowUpDate: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    onChange={(e) => {
+                      setPipelineForm({ ...pipelineForm, nextFollowUpDate: e.target.value });
+                      if (pipelineFormErrors.nextFollowUpDate) setPipelineFormErrors({ ...pipelineFormErrors, nextFollowUpDate: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.nextFollowUpDate)}`}
                   />
+                  {pipelineFormErrors.nextFollowUpDate && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.nextFollowUpDate}</p>
+                  )}
                 </div>
 
                 <div>

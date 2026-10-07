@@ -99,10 +99,15 @@ const demoLeaveRequests: LeaveRequest[] = [
 ];
 
 export const HRDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<
-    "dashboard" | "employees" | "attendance" | "leave" | "recruitment" | "reports"
-  >("dashboard");
-
+ const [activeTab, setActiveTab] = useState<
+  | "dashboard"
+  | "employees"
+  | "attendance"
+  | "leave"
+  | "recruitment"
+  | "hr-department"
+  | "reports"
+>("dashboard");
   const [search, setSearch] = useState("");
   const [mobileMenu, setMobileMenu] = useState(false);
 
@@ -234,6 +239,15 @@ export const HRDashboard: React.FC = () => {
               setMobileMenu(false);
             }}
           />
+          <SidebarButton
+  active={activeTab === "hr-department"}
+  icon={<Users size={19} />}
+  label="HR Department"
+  onClick={() => {
+    setActiveTab("hr-department");
+    setMobileMenu(false);
+  }}
+/>
 
           <SidebarButton
             active={activeTab === "reports"}
@@ -324,6 +338,8 @@ export const HRDashboard: React.FC = () => {
           )}
 
           {activeTab === "recruitment" && <RecruitmentSection />}
+
+          {activeTab === "hr-department" && <HRDepartmentSection />}
 
           {activeTab === "reports" && <ReportsSection />}
         </main>
@@ -903,7 +919,151 @@ const RecruitmentSection = () => {
     </div>
   );
 };
+// =====================================================
+// HR DEPARTMENT
+// =====================================================
 
+const HRDepartmentSection = () => {
+  const hrTeam = [
+    {
+      name: "Sarah Johnson",
+      position: "HR Manager",
+      status: "Active",
+    },
+    {
+      name: "Michael Brown",
+      position: "HR Executive",
+      status: "Active",
+    },
+    {
+      name: "Emily Davis",
+      position: "HR Coordinator",
+      status: "Active",
+    },
+    {
+      name: "Daniel Wilson",
+      position: "Recruitment Officer",
+      status: "Active",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-slate-900">
+          HR Department
+        </h2>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Manage HR department information and activities.
+        </p>
+      </div>
+
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Total Employees</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">42</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Active Employees</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">39</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">On Leave</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">3</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Open Positions</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">5</p>
+        </div>
+      </div>
+
+      {/* HR Team */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 p-5">
+          <h3 className="font-semibold text-slate-900">
+            HR Team
+          </h3>
+
+          <p className="mt-1 text-sm text-slate-500">
+            HR department team members.
+          </p>
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {hrTeam.map((member) => (
+            <div
+              key={member.name}
+              className="flex flex-col gap-2 p-5 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div>
+                <p className="font-medium text-slate-900">
+                  {member.name}
+                </p>
+
+                <p className="text-sm text-slate-500">
+                  {member.position}
+                </p>
+              </div>
+
+              <span className="w-fit rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+                {member.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent HR Activities */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 p-5">
+          <h3 className="font-semibold text-slate-900">
+            Recent HR Activities
+          </h3>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Recent activities handled by the HR department.
+          </p>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <div className="flex items-start gap-3">
+            <div className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
+            <p className="text-sm text-slate-600">
+              New employee onboarding completed.
+            </p>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
+            <p className="text-sm text-slate-600">
+              Annual leave requests reviewed.
+            </p>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
+            <p className="text-sm text-slate-600">
+              Recruitment interview scheduled.
+            </p>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="mt-1 h-2 w-2 rounded-full bg-slate-400" />
+            <p className="text-sm text-slate-600">
+              Employee records updated.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 // =====================================================
 // REPORTS
 // =====================================================
