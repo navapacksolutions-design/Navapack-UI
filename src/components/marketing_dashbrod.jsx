@@ -8,7 +8,7 @@ import { isSalesDepartment } from '../utils/departmentRouting';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
-  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut, History, Menu, X, Sun, Moon
+  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut, History, Menu, X, Sun, Moon, Bell
 } from 'lucide-react';
 
 const INITIAL_SALESPERSONS = ['Pouline Bwogi', 'Rogers Wandera', 'Haidare Karrar', 'Salesperson 4'];
@@ -539,6 +539,21 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [auditLogCount, setAuditLogCount] = useState(0);
   const [auditLogsLoading, setAuditLogsLoading] = useState(false);
   const [auditLogsError, setAuditLogsError] = useState('');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState([]);
+  const recentNotifications = useMemo(() => [...auditLogs]
+    .sort((a, b) => (Date.parse(b.timestamp) || 0) - (Date.parse(a.timestamp) || 0) || Number(b.id) - Number(a.id))
+    .slice(0, 2), [auditLogs]);
+  const unreadNotifications = recentNotifications.filter(entry => !readNotificationIds.includes(entry.id)).length;
+  useEffect(() => {
+    if (notificationsOpen) setReadNotificationIds(recentNotifications.map(entry => entry.id));
+  }, [notificationsOpen, recentNotifications]);
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const onKeyDown = event => { if (event.key === 'Escape') setNotificationsOpen(false); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [notificationsOpen]);
   const [auditLogSearch, setAuditLogSearch] = useState('');
   const [expandedAuditLogId, setExpandedAuditLogId] = useState(null);
   const [errorPopup, setErrorPopup] = useState('');
@@ -551,13 +566,14 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     setAuditLogsLoading(true);
     setAuditLogsError('');
     try {
-      const response = await authenticatedFetch(AUDIT_LOGS_API_URL, { signal });
+      const response = await authenticatedFetch(`${AUDIT_LOGS_API_URL}?ordering=-timestamp`, { signal });
       if (!response.ok) {
         throw new Error(`Failed to fetch audit logs (${response.status})`);
       }
       const payload = await response.json();
       const results = Array.isArray(payload) ? payload : payload?.results;
-      setAuditLogs(Array.isArray(results) ? results : []);
+      if (!Array.isArray(results)) throw new Error('Invalid audit log response');
+      setAuditLogs(results);
       setAuditLogCount(Number(payload?.count ?? results?.length ?? 0));
     } catch (error) {
       if (error.name !== 'AbortError') {
@@ -937,8 +953,16 @@ useEffect(() => {
 
 useEffect(() => {
   const controller = new AbortController();
-  loadAuditLogs(controller.signal);
-  return () => controller.abort();
+  let timer;
+  const refresh = async () => {
+    await loadAuditLogs(controller.signal);
+    if (!controller.signal.aborted) timer = window.setTimeout(refresh, 30000);
+  };
+  refresh();
+  return () => {
+    controller.abort();
+    window.clearTimeout(timer);
+  };
 }, []);
 
 useEffect(() => {
@@ -1377,6 +1401,16 @@ useEffect(() => {
       <div className="flex-1 w-full px-6 lg:px-8 xl:px-10 py-8 flex flex-col lg:flex-row gap-8">
         
         {/* Navigation Sidebar Tabs */}
+        <div className="flex w-full items-center gap-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
+            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            aria-pressed={theme === 'dark'}
+            className="flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white p-3 text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+          >
+            {theme === 'light' ? <Moon className="h-6 w-6" /> : <Sun className="h-6 w-6" />}
+          </button>
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen((open) => !open)}
@@ -1388,6 +1422,7 @@ useEffect(() => {
           {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           <span>Menu</span>
         </button>
+        </div>
         <nav
           id="marketing-navigation"
           aria-label="Marketing navigation"
@@ -1521,16 +1556,57 @@ useEffect(() => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
             Navapack Sales Follow-up Tracker
           </h1>
+          <div className="flex items-center gap-3">
+          {!isSalesUser && (
+            <div className="relative">
+              <button
+                type="button"
+                aria-label={`Notifications, ${unreadNotifications} unread`}
+                aria-expanded={notificationsOpen}
+                aria-controls="marketing-notifications"
+                onClick={() => setNotificationsOpen(open => !open)}
+                className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-sky-500"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadNotifications > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">{unreadNotifications}</span>}
+              </button>
+              <span className="sr-only" role="status" aria-live="polite">{unreadNotifications > 0 ? `${unreadNotifications} unread dashboard notifications` : ''}</span>
+              {notificationsOpen && (
+                <>
+                  <button type="button" tabIndex={-1} aria-label="Close notifications" onClick={() => setNotificationsOpen(false)} className="fixed inset-0 z-40 cursor-default" />
+                  <section id="marketing-notifications" aria-label="Recent notifications" className="absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-3rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                      <h2 className="text-sm font-bold text-slate-900">Recent notifications</h2>
+                      <button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications" className="rounded p-1 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+                    </div>
+                    {auditLogsError && <p role="alert" className="px-4 py-3 text-xs text-rose-700">Updates could not be refreshed. <button type="button" onClick={() => loadAuditLogs()} className="font-semibold underline">Retry</button></p>}
+                    {recentNotifications.length === 0 && <p className="px-4 py-6 text-sm text-slate-500">{auditLogsLoading ? 'Loading notifications...' : auditLogsError ? 'Notifications are unavailable.' : 'No updates yet.'}</p>}
+                    <ul className="divide-y divide-slate-200">
+                      {recentNotifications.map(entry => (
+                        <li key={entry.id} className="px-4 py-3">
+                          <p className="text-sm font-semibold text-slate-800">{entry.actor?.username || 'System'} <span className="font-normal">{({ create: 'created', update: 'updated', delete: 'deleted' })[entry.action] || entry.action || 'changed'} a record</span></p>
+                          <p className="mt-1 break-words text-xs text-slate-600">{entry.object_repr || `${entry.content_type || 'Record'} #${entry.object_id ?? ''}`}</p>
+                          <p className="mt-1 text-[11px] text-slate-500">{entry.timestamp && !Number.isNaN(Date.parse(entry.timestamp)) ? new Date(entry.timestamp).toLocaleString() : 'Time unavailable'}</p>
+                        </li>
+                      ))}
+                    </ul>
+                    <button type="button" onClick={() => { selectTab('auditLogs'); setNotificationsOpen(false); }} className="w-full border-t border-slate-200 px-4 py-3 text-sm font-semibold text-sky-700 hover:bg-sky-50">View all activity</button>
+                  </section>
+                </>
+              )}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
             aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
             aria-pressed={theme === 'dark'}
-            className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+            className="hidden lg:flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
           >
             {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
           </button>
+          </div>
           </div>
           
           {/* ======================================================== */}
