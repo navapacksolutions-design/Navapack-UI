@@ -2,7 +2,18 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 import { downloadReport, validateReportDates } from '../src/services/reportDownload';
-import { canEditSalesRecord, localDateString } from '../src/utils/salesRecordAccess';
+import { canEditSalesRecord, localDateString, ownsSalesRecord } from '../src/utils/salesRecordAccess';
+
+test('sales visibility matches salesperson identity without requiring a display name', () => {
+  const user = { name: 'Login Name', email: ' REP@example.com ' };
+  const people = [{ id: 12, name: 'Sales Rep', email: 'rep@example.com' }];
+  assert.equal(ownsSalesRecord({ salesperson: '12', salespersonId: 12 }, user, people), true);
+  assert.equal(ownsSalesRecord({ salesperson: 'Sales Rep', salespersonId: 13 }, user, people), false);
+  assert.equal(ownsSalesRecord({ salesperson: ' sales rep ' }, user, people), true);
+  assert.equal(ownsSalesRecord({ salespersonEmail: 'rep@example.com' }, user), true);
+  assert.equal(ownsSalesRecord({ salesperson: '' }, {}, people), false);
+  assert.equal(ownsSalesRecord({ salesperson: 'Another Rep' }, user, people), false);
+});
 import { dashboardForDepartment, isSalesDepartment, normalizeDepartment } from '../src/utils/departmentRouting';
 
 test('dashboard routing follows department and safely handles missing metadata', () => {

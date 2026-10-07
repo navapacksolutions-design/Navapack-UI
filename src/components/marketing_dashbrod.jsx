@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import navapackLogo from '../assets/Nava-logo.png';
 import { authenticatedFetch } from '../services/tokenAuth';
 import { ReportDownloadModal } from './ReportDownloadModal';
-import { canEditSalesRecord, localDateString } from '../utils/salesRecordAccess';
+import { ownsSalesRecord, localDateString } from '../utils/salesRecordAccess';
 import { isSalesDepartment } from '../utils/departmentRouting';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
@@ -94,6 +94,7 @@ const normalizePipelineApiPayload = (form, salespersonMap = []) => {
     salesperson: salespersonId,
     customer_company: form.customer || '',
     location_town: form.location || '',
+    email: form.email?.trim() || '',
     contact_person: form.contactPerson || '',
     telephone: form.telephone || '',
     customer_type: form.customerType || '',
@@ -125,7 +126,9 @@ const normalizePipelineRecord = (item, fallbackId) => ({
   id: item?.id ?? item?.prospect_id ?? fallbackId,
   prospectId: item?.prospect_id || '',
   dateAdded: item?.date_added || '',
-  salesperson: item?.salesperson_detail?.name || item?.salesperson || '',
+  salesperson: item?.salesperson_detail?.name || String(item?.salesperson ?? ''),
+  salespersonId: item?.salesperson_detail?.id ?? (typeof item?.salesperson === 'object' ? item.salesperson?.id : item?.salesperson),
+  salespersonEmail: item?.salesperson_detail?.email || '',
   customer: item?.customer_company || '',
   location: item?.location_town || '',
   email: item?.email || '',
@@ -171,6 +174,7 @@ const normalizeActivityApiPayload = (form, salespersonMap = []) => {
     area_route_visited: form.areaRoute || '',
     customer_company: form.customer || '',
     specific_location: form.specificLocation || '',
+    email: form.email?.trim() || '',
     prospect_status: form.prospectStatus || '',
     contact_person: form.contactPerson || '',
     telephone: form.telephone || '',
@@ -195,10 +199,13 @@ const normalizeActivityApiPayload = (form, salespersonMap = []) => {
 const normalizeActivityRecord = (item, fallbackId) => ({
   id: item?.id ?? fallbackId,
   date: item?.date || '',
-  salesperson: item?.salesperson_detail?.name || item?.salesperson || '',
+  salesperson: item?.salesperson_detail?.name || String(item?.salesperson ?? ''),
+  salespersonId: item?.salesperson_detail?.id ?? (typeof item?.salesperson === 'object' ? item.salesperson?.id : item?.salesperson),
+  salespersonEmail: item?.salesperson_detail?.email || '',
   areaRoute: item?.area_route_visited || '',
   customer: item?.customer_company || '',
   specificLocation: item?.specific_location || '',
+  email: item?.email || '',
   prospectStatus: item?.prospect_status || '',
   contactPerson: item?.contact_person || '',
   telephone: item?.telephone || '',
@@ -494,8 +501,7 @@ const formatUGX = (amount) => {
 export default function App({ onLogout, department = 'marketing', user = {} }) {
   const isSalesUser = isSalesDepartment(department);
   const sameDayEditMessage = 'Sales users can only edit their own Customer Pipeline and Daily Activity records dated today.';
-  const canEditRecord = (record) => canEditSalesRecord(isSalesUser, record, user.name || '');
-  const loggedInSalespersonName = user.name?.trim().toLowerCase() || '';
+  const canEditRecord = (record) => !isSalesUser || (record && ownsSalesRecord(record, user, salespersonData) && (record.dateAdded ?? record.date) === localDateString());
   const [activeTab, setActiveTab] = useState(isSalesUser ? 'pipeline' : 'dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const selectTab = (tab) => {
@@ -589,6 +595,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     if (!form.email || !form.email.trim()) errors.email = 'Mail ID is required.';
     else if (!EMAIL_REGEX.test(form.email.trim())) errors.email = 'Enter a valid email address.';
     if (!form.nextFollowUpDate) errors.nextFollowUpDate = 'Next Follow-up Date is required.';
+    else if (form.nextFollowUpDate < localDateString()) errors.nextFollowUpDate = 'Next Follow-up Date must be today or later.';
     if (form.telephone && !PHONE_REGEX.test(form.telephone.trim())) {
       errors.telephone = 'Enter a valid phone number.';
     }
@@ -600,6 +607,10 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
 
   const validateActivityForm = (form) => {
     const errors = {};
+    if (form.telephone && !PHONE_REGEX.test(form.telephone.trim())) errors.telephone = 'Enter a valid phone number.';
+    if (form.email && !EMAIL_REGEX.test(form.email.trim())) errors.email = 'Enter a valid email address.';
+    if (form.nextFollowUpDate && form.nextFollowUpDate < localDateString()) errors.nextFollowUpDate = 'Next Follow-up Date must be today or later.';
+    if (form.requiredByDate && form.requiredByDate < localDateString()) errors.requiredByDate = 'Required By Date must be today or later.';
     if (!form.date) errors.date = 'Date is required.';
     if (!form.salesperson || !form.salesperson.trim()) errors.salesperson = 'Salesperson is required.';
     if (!form.customer || !form.customer.trim()) errors.customer = 'Customer / Company is required.';
@@ -712,6 +723,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     areaRoute: '',
     customer: '',
     specificLocation: '',
+    email: '',
     prospectStatus: 'New Prospect Identified',
     contactPerson: '',
     telephone: '',
@@ -797,38 +809,9 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
       return response.json();
     })
     .then(data => {
-      const formattedData = data.map(item => ({
-        id: item.id,
-        prospectId: item.prospect_id,
-        dateAdded: item.date_added,
-        salesperson: item.salesperson_detail?.name || '',
-        customer: item.customer_company,
-        location: item.location_town,
-        contactPerson: item.contact_person,
-        telephone: item.telephone,
-        customerType: item.customer_type,
-        product: item.product_service,
-        specs: item.requirement_specifications,
-        estQty: item.estimated_quantity,
-        unit: item.unit,
-        estValue: Number(item.estimated_value_ugx),
-        lastContactDate: item.last_contact_date,
-        lastDiscussion: item.last_discussion_feedback,
-        nextAction: item.next_action,
-        nextFollowUpDate: item.next_followup_date,
-        followUpStatus: item.followup_status,
-        salesStage: item.sales_stage,
-        probability: item.probability_pct,
-        quotationNo: item.quotation_no,
-        quotationValue: Number(item.quotation_value_ugx),
-        sampleStatus: item.sample_trial_status,
-        actualOrderValue: Number(item.actual_order_value_ugx),
-        reasonLost: item.reason_lost,
-        remarks: item.remarks_management_notes,
-        competitor: item.competitor_won_by,
-        stageLastUpdated: item.stage_last_updated,
-        correctiveAction: item.corrective_action
-      }));
+      const records = Array.isArray(data) ? data : data?.results;
+      if (!Array.isArray(records)) throw new Error('Invalid pipeline list response');
+      const formattedData = records.map(item => normalizePipelineRecord(item, item.id));
 
       setPipelineData(formattedData);
     })
@@ -871,7 +854,9 @@ useEffect(() => {
       return response.json();
     })
     .then(data => {
-      const formattedData = data.map(item => normalizeActivityRecord(item, item.id));
+      const records = Array.isArray(data) ? data : data?.results;
+      if (!Array.isArray(records)) throw new Error('Invalid daily activity list response');
+      const formattedData = records.map(item => normalizeActivityRecord(item, item.id));
       setActivityData(formattedData);
     })
     .catch(error => {
@@ -1298,13 +1283,13 @@ useEffect(() => {
 
   const visiblePipelineData = useMemo(() => {
     if (!isSalesUser) return pipelineData;
-    return pipelineData.filter(item => item.salesperson?.trim().toLowerCase() === loggedInSalespersonName);
-  }, [isSalesUser, loggedInSalespersonName, pipelineData]);
+    return pipelineData.filter(item => ownsSalesRecord(item, user, salespersonData));
+  }, [isSalesUser, user.name, user.email, salespersonData, pipelineData]);
 
   const visibleActivityData = useMemo(() => {
     if (!isSalesUser) return activityData;
-    return activityData.filter(item => item.salesperson?.trim().toLowerCase() === loggedInSalespersonName);
-  }, [isSalesUser, loggedInSalespersonName, activityData]);
+    return activityData.filter(item => ownsSalesRecord(item, user, salespersonData));
+  }, [isSalesUser, user.name, user.email, salespersonData, activityData]);
 
   const filteredPipeline = useMemo(() => {
     return visiblePipelineData.filter(item => {
@@ -1762,6 +1747,7 @@ useEffect(() => {
                         <th className="p-2 border-r border-slate-200">Location / Town</th>
                         <th className="p-2 border-r border-slate-200">Contact Person</th>
                         <th className="p-2 border-r border-slate-200">Telephone</th>
+                        <th className="p-2 border-r border-slate-200">Email</th>
                         <th className="p-2 border-r border-slate-200">Customer Type</th>
                         <th className="p-2 border-r border-slate-200">Product / Service</th>
                         <th className="p-2 border-r border-slate-200">Requirements / Specs</th>
@@ -1825,6 +1811,7 @@ useEffect(() => {
                           <td className="p-2 border-r border-slate-200 text-slate-600">{item.location}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-700">{item.contactPerson}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-600">{item.telephone}</td>
+                          <td className="p-2 border-r border-slate-200 text-slate-600">{item.email || '-'}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-600">{item.customerType}</td>
                           <td className="p-2 border-r border-slate-200 font-medium text-slate-800">{item.product}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-600 truncate max-w-xs">{item.specs}</td>
@@ -2069,6 +2056,7 @@ useEffect(() => {
                         <th className="p-2 border-r border-slate-200">Prospect Status</th>
                         <th className="p-2 border-r border-slate-200">Contact Person</th>
                         <th className="p-2 border-r border-slate-200">Telephone</th>
+                        <th className="p-2 border-r border-slate-200">Email</th>
                         <th className="p-2 border-r border-slate-200">Product / Service</th>
                         <th className="p-2 border-r border-slate-200">Activity Type</th>
                         <th className="p-2 border-r border-slate-200">Req. Est Volume</th>
@@ -2117,6 +2105,7 @@ useEffect(() => {
                           <td className="p-2 border-r border-slate-200 text-slate-600">{log.prospectStatus}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-700">{log.contactPerson}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-600">{log.telephone}</td>
+                          <td className="p-2 border-r border-slate-200 text-slate-600">{log.email || '-'}</td>
                           <td className="p-2 border-r border-slate-200 text-slate-800 font-medium">{log.product}</td>
                           <td className="p-2 border-r border-slate-200">
                             <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 font-semibold text-slate-700">
@@ -2968,7 +2957,7 @@ useEffect(() => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Mail ID *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Email *</label>
                   <input
                     type="email"
                     value={pipelineForm.email}
@@ -3089,6 +3078,7 @@ useEffect(() => {
                   <input
                     type="date"
                     value={pipelineForm.nextFollowUpDate}
+                    min={localDateString()}
                     onChange={(e) => {
                       setPipelineForm({ ...pipelineForm, nextFollowUpDate: e.target.value });
                       if (pipelineFormErrors.nextFollowUpDate) setPipelineFormErrors({ ...pipelineFormErrors, nextFollowUpDate: undefined });
@@ -3260,13 +3250,39 @@ useEffect(() => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Telephone</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
                   <input
-                    type="text"
+                    type="tel"
                     value={activityForm.telephone}
-                    onChange={(e) => setActivityForm({ ...activityForm, telephone: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="e.g. +256 700 123456"
+                    onChange={(e) => {
+                      setActivityForm({ ...activityForm, telephone: e.target.value });
+                      if (activityFormErrors.telephone) setActivityFormErrors({ ...activityFormErrors, telephone: undefined });
+                    }}
+                    className={`w-full border rounded p-2 ${fieldErrorClass(activityFormErrors.telephone)}`}
                   />
+                  {activityFormErrors.telephone && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.telephone}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={activityForm.email || ''}
+                    onChange={(e) => {
+                      setActivityForm({ ...activityForm, email: e.target.value });
+                      if (activityFormErrors.email) setActivityFormErrors({ ...activityFormErrors, email: undefined });
+                    }}
+                    className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(activityFormErrors.email)}`}
+                    placeholder="customer@example.com"
+                  />
+                  {activityFormErrors.email && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.email}</p>
+                  )}
                 </div>
 
                 <div>
@@ -3376,9 +3392,16 @@ useEffect(() => {
                   <input
                     type="date"
                     value={activityForm.nextFollowUpDate}
-                    onChange={(e) => setActivityForm({ ...activityForm, nextFollowUpDate: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    min={localDateString()}
+                    onChange={(e) => {
+                      setActivityForm({ ...activityForm, nextFollowUpDate: e.target.value });
+                      if (activityFormErrors.nextFollowUpDate) setActivityFormErrors({ ...activityFormErrors, nextFollowUpDate: undefined });
+                    }}
+                    className={`w-full border rounded p-2 ${fieldErrorClass(activityFormErrors.nextFollowUpDate)}`}
                   />
+                  {activityFormErrors.nextFollowUpDate && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.nextFollowUpDate}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Quotation Submitted (UGX)</label>
@@ -3413,9 +3436,16 @@ useEffect(() => {
                   <input
                     type="date"
                     value={activityForm.requiredByDate}
-                    onChange={(e) => setActivityForm({ ...activityForm, requiredByDate: e.target.value })}
-                    className="w-full border border-slate-300 rounded p-2"
+                    min={localDateString()}
+                    onChange={(e) => {
+                      setActivityForm({ ...activityForm, requiredByDate: e.target.value });
+                      if (activityFormErrors.requiredByDate) setActivityFormErrors({ ...activityFormErrors, requiredByDate: undefined });
+                    }}
+                    className={`w-full border rounded p-2 ${fieldErrorClass(activityFormErrors.requiredByDate)}`}
                   />
+                  {activityFormErrors.requiredByDate && (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{activityFormErrors.requiredByDate}</p>
+                  )}
                 </div>
               </div>
 
@@ -3635,6 +3665,7 @@ useEffect(() => {
               <div className="grid grid-cols-2 gap-3 border-b border-slate-100 pb-3">
                 <div><span className="text-slate-400">Location:</span> <p className="font-semibold text-slate-800">{selectedPipelineItem.location || 'N/A'}</p></div>
                 <div><span className="text-slate-400">Contact:</span> <p className="font-semibold text-slate-800">{selectedPipelineItem.contactPerson} ({selectedPipelineItem.telephone})</p></div>
+                <div><span className="text-slate-400">Email:</span> <p className="font-semibold text-slate-800">{selectedPipelineItem.email || '-'}</p></div>
                 <div><span className="text-slate-400">Customer Type:</span> <p className="font-semibold text-slate-800">{selectedPipelineItem.customerType}</p></div>
                 <div><span className="text-slate-400">Product:</span> <p className="font-semibold text-slate-800">{selectedPipelineItem.product}</p></div>
               </div>
