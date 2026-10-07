@@ -82,10 +82,6 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onSignupSuccess, onN
         return;
       }
 
-      if (result.token) {
-        localStorage.setItem('token', result.token);
-      }
-
       onSignupSuccess(result.user || { 
         email: formData.email, 
         name: formData.name, 

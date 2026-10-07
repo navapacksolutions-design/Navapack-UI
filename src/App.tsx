@@ -23,6 +23,7 @@ import { Dashboard } from './components/Dashboard';
 import MarketingDashboard from './components/marketing_dashbrod.jsx';
 import { HRDashboard } from './components/hr_dashboard';
 import { clearAuthToken } from './services/tokenAuth';
+import { dashboardForDepartment, normalizeDepartment } from './utils/departmentRouting';
 
 export default function App() {
   // Get current screen from URL
@@ -98,6 +99,18 @@ export default function App() {
       behavior: 'instant',
     });
   }, [currentScreen]);
+
+  // Keep direct links, refreshes and browser history on the user's department dashboard.
+  useEffect(() => {
+    if (!['dashboard', 'marketing-dashboard', 'hr-dashboard', 'admin-products'].includes(currentScreen)) return;
+    const target = sessionStorage.getItem('navapack_token')
+      ? dashboardForDepartment(loggedInDepartment)
+      : 'login';
+    if (target !== currentScreen) {
+      setCurrentScreen(target);
+      window.history.replaceState({}, '', `/${target}`);
+    }
+  }, [currentScreen, loggedInDepartment]);
 
   // Navigation
   const handleNavigate = (
@@ -316,7 +329,7 @@ export default function App() {
             {currentScreen === 'login' && (
               <LoginScreen
                 onLogin={(user) => {
-                  const department = user.department?.trim().toLowerCase();
+                  const department = normalizeDepartment(user.department);
                   const userIdentity = {
                     name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim(),
                     email: user.email,
@@ -326,11 +339,7 @@ export default function App() {
                   sessionStorage.setItem('navapack_department', department || '');
                   sessionStorage.setItem('navapack_user', JSON.stringify(userIdentity));
                   handleNavigate(
-                    department === 'hr'
-                      ? 'hr-dashboard'
-                      : department.includes('sales') || department.includes('marketing')
-                        ? 'marketing-dashboard'
-                        : 'dashboard',
+                    dashboardForDepartment(department),
                     'none'
                    );
                   }}
@@ -351,7 +360,7 @@ export default function App() {
               <SignupScreen
                 onSignupSuccess={() =>
                   handleNavigate(
-                    'dashboard',
+                    'login',
                     'none'
                   )
                 }

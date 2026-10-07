@@ -22,7 +22,7 @@ interface LoginScreenProps {
 // Change this if your frontend isn't running against a local backend.
 const API_BASE_URL = 'https://api.navapacksolutions.com/api';
 const LOGIN_API_URL = `${API_BASE_URL}/login/`;
-const SALESPERSONS_API_URL = `${API_BASE_URL}/salespersons/`;
+const USERS_API_URL = `${API_BASE_URL}/users/`;
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToSignup }) => {
   const [email, setEmail] = useState('');
@@ -46,7 +46,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
       let result: any = {};
@@ -75,52 +75,45 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
       }
       saveAuthToken(result.token.trim());
 
-      // Base user info from the login response — login succeeds even if the
-      // salesperson lookup below fails for any reason.
-      let mergedUser: User = { ...(result.user || {}), email };
+      let apiUser: User | undefined;
+      let usersUrl: string | null = USERS_API_URL;
+      const visitedPages = new Set<string>();
 
-      try {
-        const salespersonsResponse = await authenticatedFetch(SALESPERSONS_API_URL);
+      while (usersUrl && !apiUser) {
+        if (visitedPages.has(usersUrl)) throw new Error('Invalid users pagination.');
+        visitedPages.add(usersUrl);
+        const usersResponse = await authenticatedFetch(usersUrl);
+        if (!usersResponse.ok) throw new Error('Unable to load users.');
 
-        if (salespersonsResponse.ok) {
-          const salespersonsPayload = await salespersonsResponse.json();
-          const salespersons = Array.isArray(salespersonsPayload)
-            ? salespersonsPayload
-            : salespersonsPayload.results || [];
-          const loggedInSalesperson = salespersons.find(
-            (salesperson: User) =>
-              salesperson.email?.trim().toLowerCase() === normalizedEmail,
-          );
+        const payload = await usersResponse.json();
+        const users: User[] = Array.isArray(payload) ? payload : payload.results;
+        if (!Array.isArray(users)) throw new Error('Invalid users response.');
+        apiUser = users.find((user) => user.email?.trim().toLowerCase() === normalizedEmail);
 
-          if (loggedInSalesperson) {
-            mergedUser = { ...mergedUser, ...loggedInSalesperson, email };
-          }
-        } else {
-          console.warn(
-            `Salesperson lookup failed with status ${salespersonsResponse.status}; continuing with base user info.`,
-          );
+        usersUrl = !Array.isArray(payload) && payload.next
+          ? new URL(payload.next, usersUrl).href
+          : null;
+        if (usersUrl && new URL(usersUrl).origin !== new URL(USERS_API_URL).origin) {
+          throw new Error('Invalid users pagination URL.');
         }
-      } catch (lookupErr) {
-        // Don't block login if this secondary call fails.
-        console.warn('Salesperson lookup failed:', lookupErr);
       }
 
-      if (normalizedEmail === 'marketing@navapack.com' && !mergedUser.department) {
-        mergedUser = { ...mergedUser, role: 'marketing', department: 'marketing' };
+      if (!apiUser || typeof apiUser.department !== 'string' || !apiUser.department.trim()) {
+        clearAuthToken();
+        setError('Your user record has no department. Please contact your administrator.');
+        return;
       }
-      if (
-        [
-          'pouline01@navapack.com',
-          'haidare01@navpack.com',
-          'rogers01@navapack.com',
-        ].includes(normalizedEmail) &&
-        !mergedUser.department
-      ) {
-        mergedUser = { ...mergedUser, department: 'sales' };
-      }
+
+      const mergedUser: User = {
+        ...(result.user || {}),
+        ...apiUser,
+        department: apiUser.department.trim(),
+        email: normalizedEmail,
+      };
       onLogin(mergedUser);
     } catch (err) {
-      setError('Something went wrong. Please check your backend connection.');
+      clearAuthToken();
+      setError('Unable to verify your user department. Please check your backend connection and try again.');
     } finally {
       setLoading(false);
     }

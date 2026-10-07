@@ -3,6 +3,7 @@ import navapackLogo from '../assets/Nava-logo.png';
 import { authenticatedFetch } from '../services/tokenAuth';
 import { ReportDownloadModal } from './ReportDownloadModal';
 import { canEditSalesRecord, localDateString } from '../utils/salesRecordAccess';
+import { isSalesDepartment } from '../utils/departmentRouting';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
@@ -76,7 +77,7 @@ const normalizeStatusLabel = (value) => {
 };
 
 const normalizePipelineApiPayload = (form, salespersonMap = []) => {
-  const salesperson = salespersonMap.find(person => person.name === form.salesperson);
+  const salesperson = salespersonMap.find(person => person.name?.trim().toLowerCase() === String(form.salesperson).trim().toLowerCase());
   const salespersonId = salesperson?.id ?? (Number.isFinite(Number(form.salesperson)) ? Number(form.salesperson) : null);
   const normalizeApiDate = (value) => {
     const match = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
@@ -155,7 +156,7 @@ const normalizePipelineRecord = (item, fallbackId) => ({
 });
 
 const normalizeActivityApiPayload = (form, salespersonMap = []) => {
-  const salesperson = salespersonMap.find(person => person.name === form.salesperson);
+  const salesperson = salespersonMap.find(person => person.name?.trim().toLowerCase() === String(form.salesperson).trim().toLowerCase());
   const salespersonId = salesperson?.id ?? (Number.isFinite(Number(form.salesperson)) ? Number(form.salesperson) : null);
   const normalizeApiDate = (value) => {
     const match = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
@@ -491,7 +492,7 @@ const formatUGX = (amount) => {
 };
 
 export default function App({ onLogout, department = 'marketing', user = {} }) {
-  const isSalesUser = department.trim().toLowerCase() === 'sales';
+  const isSalesUser = isSalesDepartment(department);
   const sameDayEditMessage = 'Sales users can only edit their own Customer Pipeline and Daily Activity records dated today.';
   const canEditRecord = (record) => canEditSalesRecord(isSalesUser, record, user.name || '');
   const loggedInSalespersonName = user.name?.trim().toLowerCase() || '';
@@ -504,6 +505,8 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [pipelineData, setPipelineData] = useState([]);
   const [activityData, setActivityData] = useState([]);
   const [salespersonData, setSalespersonData] = useState([]);
+  const [salespersonsLoading, setSalespersonsLoading] = useState(true);
+  const [salespersonsError, setSalespersonsError] = useState('');
   const [salespersons, setSalespersons] = useState(INITIAL_SALESPERSONS);
   const [productServices, setProductServices] = useState(INITIAL_PRODUCTS);
   const [salesStages, setSalesStages] = useState(INITIAL_SALES_STAGES);
@@ -884,16 +887,33 @@ useEffect(() => {
       }
       return response.json();
     })
-    .then(data => {
-      const names = normalizeMasterOptionList(data.map((person) => ({ name: person?.name || person?.salesperson_name || '' })))
+    .then(payload => {
+      const data = Array.isArray(payload) ? payload : payload?.results;
+      if (!Array.isArray(data)) throw new Error('Invalid salesperson list response');
+      const records = data.map(person => normalizeSalespersonRecord({ ...person, name: person?.name || person?.salesperson_name || '' }));
+      const names = normalizeMasterOptionList(records)
         .filter(Boolean);
-      setSalespersonData(data);
-      setSalespersons(names.length ? names : INITIAL_SALESPERSONS);
+      setSalespersonData(records);
+      setSalespersons(names);
+      setSalespersonsError('');
+      const currentPerson = records.find(person =>
+        (user.email && person.email?.trim().toLowerCase() === user.email.trim().toLowerCase())
+        || (user.name && person.name?.trim().toLowerCase() === user.name.trim().toLowerCase()));
+      const defaultName = currentPerson?.name || (isSalesUser ? user.name : names[0]) || '';
+      const updateDefault = form => {
+        if (form.id) return form;
+        const selectedPerson = records.find(person => person.name?.trim().toLowerCase() === String(form.salesperson).trim().toLowerCase());
+        return { ...form, salesperson: selectedPerson?.name || defaultName };
+      };
+      setPipelineForm(updateDefault);
+      setActivityForm(updateDefault);
     })
     .catch(error => {
       console.error('Error fetching salespersons:', error);
-      setSalespersons(INITIAL_SALESPERSONS);
-    });
+      setSalespersons([]);
+      setSalespersonsError('Unable to load salespersons. Please refresh the page and try again.');
+    })
+    .finally(() => setSalespersonsLoading(false));
 }, []);
 
 // Dashboard aggregate metrics API
@@ -1014,7 +1034,7 @@ useEffect(() => {
 
     const payload = normalizePipelineApiPayload(pipelineForm, salespersonData);
     if (!payload.salesperson) {
-      showErrorPopup(null, 'Please wait for the salesperson list to load, then try again.');
+      showErrorPopup(null, salespersonsLoading ? 'Please wait for the salesperson list to load, then try again.' : salespersonsError || 'No matching salesperson was found. Please select a salesperson or ask your administrator to check your salesperson profile.');
       return;
     }
     const apiUrl = pipelineForm.id ? `${PIPELINE_API_URL}${pipelineForm.id}/` : PIPELINE_API_URL;
@@ -1105,7 +1125,7 @@ useEffect(() => {
 
     const payload = normalizeActivityApiPayload(activityForm, salespersonData);
     if (!payload.salesperson) {
-      showErrorPopup(null, 'Please wait for the salesperson list to load, then try again.');
+      showErrorPopup(null, salespersonsLoading ? 'Please wait for the salesperson list to load, then try again.' : salespersonsError || 'No matching salesperson was found. Please select a salesperson or ask your administrator to check your salesperson profile.');
       return;
     }
     const apiUrl = activityForm.id ? `${ACTIVITY_API_URL}${activityForm.id}/` : ACTIVITY_API_URL;

@@ -3,6 +3,22 @@ import { test } from 'node:test';
 import { build } from 'esbuild';
 import { downloadReport, validateReportDates } from '../src/services/reportDownload';
 import { canEditSalesRecord, localDateString } from '../src/utils/salesRecordAccess';
+import { dashboardForDepartment, isSalesDepartment, normalizeDepartment } from '../src/utils/departmentRouting';
+
+test('dashboard routing follows department and safely handles missing metadata', () => {
+  for (const department of ['Sales', ' Sales & Custom Quotes ', 'MARKETING', 'Sales and Marketing']) {
+    assert.equal(dashboardForDepartment(department), 'marketing-dashboard');
+  }
+  assert.equal(dashboardForDepartment(undefined, 'marketing'), 'marketing-dashboard');
+  assert.equal(dashboardForDepartment('HR'), 'hr-dashboard');
+  assert.equal(dashboardForDepartment('Human Resources'), 'hr-dashboard');
+  assert.equal(dashboardForDepartment('Production', 'marketing'), 'dashboard');
+  assert.equal(dashboardForDepartment(), 'dashboard');
+  assert.equal(normalizeDepartment('  ', 'Sales'), 'sales');
+  assert.equal(isSalesDepartment('Sales & Custom Quotes'), true);
+  assert.equal(isSalesDepartment('Sales and Marketing'), false);
+  assert.equal(isSalesDepartment(), false);
+});
 
 test('sales edits require own same-day pipeline or activity record', () => {
   const today = '2026-10-03';
