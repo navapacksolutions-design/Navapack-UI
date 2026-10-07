@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import './marketingTheme.css';
 import navapackLogo from '../assets/Nava-logo.png';
 import { authenticatedFetch } from '../services/tokenAuth';
 import { ReportDownloadModal } from './ReportDownloadModal';
@@ -7,7 +8,7 @@ import { isSalesDepartment } from '../utils/departmentRouting';
 import { 
   BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
   Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
-  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut, History, Menu, X
+  Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut, History, Menu, X, Sun, Moon
 } from 'lucide-react';
 
 const INITIAL_SALESPERSONS = ['Pouline Bwogi', 'Rogers Wandera', 'Haidare Karrar', 'Salesperson 4'];
@@ -499,6 +500,20 @@ const formatUGX = (amount) => {
 };
 
 export default function App({ onLogout, department = 'marketing', user = {} }) {
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('navapack_marketing_theme') === 'dark' ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('navapack_marketing_theme', theme);
+    } catch {
+      // Theme switching still works when browser storage is unavailable.
+    }
+  }, [theme]);
   const isSalesUser = isSalesDepartment(department);
   const sameDayEditMessage = 'Sales users can only edit their own Customer Pipeline and Daily Activity records dated today.';
   const canEditRecord = (record) => !isSalesUser || (record && ownsSalesRecord(record, user, salespersonData) && (record.dateAdded ?? record.date) === localDateString());
@@ -1338,7 +1353,7 @@ useEffect(() => {
   }, [auditLogs, auditLogSearch]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+    <div data-theme={theme} className="marketing-dashboard min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
       {errorPopup && (
         <div className="fixed right-4 top-4 z-[100] w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-rose-200 bg-white p-4 shadow-2xl" role="alert">
           <div className="flex items-start gap-3">
@@ -1502,9 +1517,21 @@ useEffect(() => {
 
         {/* Content View Area */}
         <main className="flex-1 min-w-0">
-          <h1 className="mb-6 text-3xl font-bold tracking-tight text-slate-900">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
             Navapack Sales Follow-up Tracker
           </h1>
+          <button
+            type="button"
+            onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
+            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            aria-pressed={theme === 'dark'}
+            className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
+          >
+            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
+          </button>
+          </div>
           
           {/* ======================================================== */}
           {/* TAB 1: DASH BOARD VIEW                                    */}
