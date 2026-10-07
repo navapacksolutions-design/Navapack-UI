@@ -5,22 +5,22 @@ import { authenticatedFetch } from '../services/tokenAuth';
 import { ReportDownloadModal } from './ReportDownloadModal';
 import { ownsSalesRecord, localDateString } from '../utils/salesRecordAccess';
 import { isSalesDepartment } from '../utils/departmentRouting';
-import { 
-  BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2, 
-  Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown, 
+import {
+  BarChart3, Users, Calendar, FileText, List, Search, Plus, Eye, Edit2, Trash2,
+  Filter, Download, AlertCircle, CheckCircle2, Clock, XCircle, ChevronDown,
   Building2, Phone, MapPin, DollarSign, Package, ShieldAlert, CheckSquare, RefreshCw, Layers, LogOut, History, Menu, X, Sun, Moon, Bell
 } from 'lucide-react';
 
 const INITIAL_SALESPERSONS = ['Pouline Bwogi', 'Rogers Wandera', 'Haidare Karrar', 'Salesperson 4'];
 const INITIAL_SALES_STAGES = [
-  'New Lead', 'Requirement Identified', 'Sample Requested', 'Quotation Sent', 
+  'New Lead', 'Requirement Identified', 'Sample Requested', 'Quotation Sent',
   'Negotiation', 'Order Won', 'Order Lost', 'On Hold'
 ];
 const INITIAL_CUSTOMER_TYPES = ['Manufacturer', 'Wholesaler', 'Retailer', 'Corporate', 'Government', 'Distributor'];
 const INITIAL_DEPTS = ['Sales', 'Production', 'Quality Control', 'Accounts/Finance', 'Logistics/Dispatch', 'Management'];
 const INITIAL_ISSUE_STATUSES = ['Pending', 'On Hold', 'Resolved'];
 const INITIAL_PRODUCTS = [
-  'Customized Printed Polythene Bags', 'Plain HDPE Bags', 'LDPE Packaging Rolls', 
+  'Customized Printed Polythene Bags', 'Plain HDPE Bags', 'LDPE Packaging Rolls',
   'Biodegradable Carrier Bags', 'Industrial Shrink Wrap'
 ];
 
@@ -693,7 +693,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [pipelineSearch, setPipelineSearch] = useState('');
   const [pipelineStageFilter, setPipelineStageFilter] = useState('ALL');
   const [activitySearch, setActivitySearch] = useState('');
-  
+
   // Weekly Report Date Range
   const [weeklyStartDate, setWeeklyStartDate] = useState('2026-09-21');
   const [weeklyEndDate, setWeeklyEndDate] = useState('2026-09-26');
@@ -706,7 +706,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const [isPipelineModalOpen, setIsPipelineModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedPipelineItem, setSelectedPipelineItem] = useState(null);
-  
+
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [selectedActivityItem, setSelectedActivityItem] = useState(null);
 
@@ -1332,12 +1332,12 @@ useEffect(() => {
 
   const filteredPipeline = useMemo(() => {
     return visiblePipelineData.filter(item => {
-      const matchesSearch = 
+      const matchesSearch =
         item.customer.toLowerCase().includes(pipelineSearch.toLowerCase()) ||
         item.salesperson.toLowerCase().includes(pipelineSearch.toLowerCase()) ||
         item.product.toLowerCase().includes(pipelineSearch.toLowerCase()) ||
         item.location.toLowerCase().includes(pipelineSearch.toLowerCase());
-      
+
       const matchesStage = pipelineStageFilter === 'ALL' || item.salesStage === pipelineStageFilter;
       return matchesSearch && matchesStage;
     }).sort((first, second) => String(first.prospectId || first.id).localeCompare(
@@ -1376,6 +1376,61 @@ useEffect(() => {
     ].some((value) => String(value ?? '').toLowerCase().includes(query)));
   }, [auditLogs, auditLogSearch]);
 
+  const renderHeaderControls = (mobile) => (
+          <div className="flex items-center gap-3">
+          {!isSalesUser && (
+            <div className="relative">
+              <button
+                type="button"
+                aria-label={`Notifications, ${unreadNotifications} unread`}
+                aria-expanded={notificationsOpen}
+                aria-controls={mobile ? "mobile-marketing-notifications" : "marketing-notifications"}
+                onClick={() => setNotificationsOpen(open => !open)}
+                className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-sky-500"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadNotifications > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">{unreadNotifications}</span>}
+              </button>
+              <span className="sr-only" role="status" aria-live="polite">{unreadNotifications > 0 ? `${unreadNotifications} unread dashboard notifications` : ''}</span>
+              {notificationsOpen && (
+                <>
+                  <button type="button" tabIndex={-1} aria-label="Close notifications" onClick={() => setNotificationsOpen(false)} className="fixed inset-0 z-40 cursor-default" />
+                  <section id={mobile ? "mobile-marketing-notifications" : "marketing-notifications"} aria-label="Recent notifications" className="absolute -right-12 lg:right-0 top-12 z-50 w-80 max-w-[calc(100vw-3rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                      <h2 className="text-sm font-bold text-slate-900">Recent notifications</h2>
+                      <button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications" className="rounded p-1 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+                    </div>
+                    {auditLogsError && <p role="alert" className="px-4 py-3 text-xs text-rose-700">Updates could not be refreshed. <button type="button" onClick={() => loadAuditLogs()} className="font-semibold underline">Retry</button></p>}
+                    {recentNotifications.length === 0 && <p className="px-4 py-6 text-sm text-slate-500">{auditLogsLoading ? 'Loading notifications...' : auditLogsError ? 'Notifications are unavailable.' : 'No updates yet.'}</p>}
+                    <ul className="divide-y divide-slate-200">
+                      {recentNotifications.map(entry => (
+                        <li key={entry.id} className="px-4 py-3">
+                          <p className="text-sm font-semibold text-slate-800">{entry.actor?.username || 'System'} <span className="font-normal">{({ create: 'created', update: 'updated', delete: 'deleted' })[entry.action] || entry.action || 'changed'} a record</span></p>
+                          <p className="mt-1 break-words text-xs text-slate-600">{entry.object_repr || `${entry.content_type || 'Record'} #${entry.object_id ?? ''}`}</p>
+                          <p className="mt-1 text-[11px] text-slate-500">{entry.timestamp && !Number.isNaN(Date.parse(entry.timestamp)) ? new Date(entry.timestamp).toLocaleString() : 'Time unavailable'}</p>
+                        </li>
+                      ))}
+                    </ul>
+                    <button type="button" onClick={() => { selectTab('auditLogs'); setNotificationsOpen(false); }} className="w-full border-t border-slate-200 px-4 py-3 text-sm font-semibold text-sky-700 hover:bg-sky-50">View all activity</button>
+                  </section>
+                </>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
+            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            aria-pressed={theme === 'dark'}
+            className={`flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white ${mobile ? "h-10 w-10" : "px-4 py-2"} text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500`}
+          >
+            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            {!mobile && <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>}
+          </button>
+          </div>
+
+  );
+
   return (
     <div data-theme={theme} className="marketing-dashboard min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
       {errorPopup && (
@@ -1399,18 +1454,9 @@ useEffect(() => {
       )}
       {/* Main Container */}
       <div className="flex-1 w-full px-6 lg:px-8 xl:px-10 py-8 flex flex-col lg:flex-row gap-8">
-        
+
         {/* Navigation Sidebar Tabs */}
-        <div className="flex w-full items-center gap-3 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
-            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-            aria-pressed={theme === 'dark'}
-            className="flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white p-3 text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-          >
-            {theme === 'light' ? <Moon className="h-6 w-6" /> : <Sun className="h-6 w-6" />}
-          </button>
+        <div className="flex w-full items-center justify-between gap-3 lg:hidden">
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen((open) => !open)}
@@ -1422,6 +1468,7 @@ useEffect(() => {
           {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           <span>Menu</span>
         </button>
+          {renderHeaderControls(true)}
         </div>
         <nav
           id="marketing-navigation"
@@ -1556,59 +1603,9 @@ useEffect(() => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
             Navapack Sales Follow-up Tracker
           </h1>
-          <div className="flex items-center gap-3">
-          {!isSalesUser && (
-            <div className="relative">
-              <button
-                type="button"
-                aria-label={`Notifications, ${unreadNotifications} unread`}
-                aria-expanded={notificationsOpen}
-                aria-controls="marketing-notifications"
-                onClick={() => setNotificationsOpen(open => !open)}
-                className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-sky-500"
-              >
-                <Bell className="h-5 w-5" />
-                {unreadNotifications > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">{unreadNotifications}</span>}
-              </button>
-              <span className="sr-only" role="status" aria-live="polite">{unreadNotifications > 0 ? `${unreadNotifications} unread dashboard notifications` : ''}</span>
-              {notificationsOpen && (
-                <>
-                  <button type="button" tabIndex={-1} aria-label="Close notifications" onClick={() => setNotificationsOpen(false)} className="fixed inset-0 z-40 cursor-default" />
-                  <section id="marketing-notifications" aria-label="Recent notifications" className="absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-3rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-                    <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                      <h2 className="text-sm font-bold text-slate-900">Recent notifications</h2>
-                      <button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications" className="rounded p-1 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
-                    </div>
-                    {auditLogsError && <p role="alert" className="px-4 py-3 text-xs text-rose-700">Updates could not be refreshed. <button type="button" onClick={() => loadAuditLogs()} className="font-semibold underline">Retry</button></p>}
-                    {recentNotifications.length === 0 && <p className="px-4 py-6 text-sm text-slate-500">{auditLogsLoading ? 'Loading notifications...' : auditLogsError ? 'Notifications are unavailable.' : 'No updates yet.'}</p>}
-                    <ul className="divide-y divide-slate-200">
-                      {recentNotifications.map(entry => (
-                        <li key={entry.id} className="px-4 py-3">
-                          <p className="text-sm font-semibold text-slate-800">{entry.actor?.username || 'System'} <span className="font-normal">{({ create: 'created', update: 'updated', delete: 'deleted' })[entry.action] || entry.action || 'changed'} a record</span></p>
-                          <p className="mt-1 break-words text-xs text-slate-600">{entry.object_repr || `${entry.content_type || 'Record'} #${entry.object_id ?? ''}`}</p>
-                          <p className="mt-1 text-[11px] text-slate-500">{entry.timestamp && !Number.isNaN(Date.parse(entry.timestamp)) ? new Date(entry.timestamp).toLocaleString() : 'Time unavailable'}</p>
-                        </li>
-                      ))}
-                    </ul>
-                    <button type="button" onClick={() => { selectTab('auditLogs'); setNotificationsOpen(false); }} className="w-full border-t border-slate-200 px-4 py-3 text-sm font-semibold text-sky-700 hover:bg-sky-50">View all activity</button>
-                  </section>
-                </>
-              )}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setTheme(current => current === 'light' ? 'dark' : 'light')}
-            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-            aria-pressed={theme === 'dark'}
-            className="hidden lg:flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500"
-          >
-            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
-          </button>
+          <div className="hidden lg:block">{renderHeaderControls(false)}</div>
           </div>
-          </div>
-          
+
           {/* ======================================================== */}
           {/* TAB 1: DASH BOARD VIEW                                    */}
           {/* ======================================================== */}
@@ -1620,10 +1617,10 @@ useEffect(() => {
                   <span>{dashboardMetricsError}</span>
                 </div>
               )}
-              
+
               {/* Top Metric Cards Section */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                
+
                 {/* Critical Action Card (Magenta/Pink Theme) */}
                 <div className="bg-gradient-to-br from-pink-50 to-rose-100 border border-pink-300 rounded-xl p-5 shadow-sm">
                   <div className="flex items-center justify-between pb-3 border-b border-pink-200">
@@ -1763,7 +1760,7 @@ useEffect(() => {
                           </tr>
                         );
                       })}
-                      
+
                       {/* Summary Row */}
                       <tr className="bg-slate-900 text-white font-bold">
                         <td className="p-3 border-r border-slate-700">TOTAL TEAM</td>
@@ -1786,7 +1783,7 @@ useEffect(() => {
           {/* ======================================================== */}
           {activeTab === 'pipeline' && (
             <div className="space-y-4">
-              
+
               {/* Toolbar */}
               <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-3 justify-between items-center">
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -1836,7 +1833,7 @@ useEffect(() => {
                   <span className="font-semibold uppercase tracking-wider">Master Customer Pipeline Database (29 Data Fields)</span>
                   <span>Showing {filteredPipeline.length} of {visiblePipelineData.length} records</span>
                 </div>
-                
+
                 <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                   <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
                     <thead className="bg-slate-100 text-slate-700 sticky top-0 border-b border-slate-200 font-bold z-10">
@@ -2108,10 +2105,10 @@ useEffect(() => {
           {/* TAB 4: DAILY ACTIVITY LOG (22 Columns Datatable)         */}
           {/* ======================================================== */}
 
-          
+
           {activeTab === 'activity' && (
             <div className="space-y-4">
-              
+
               {/* Toolbar */}
               <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-3 justify-between items-center">
                 <div className="relative w-full md:w-80">
@@ -2396,7 +2393,7 @@ useEffect(() => {
           {/* ======================================================== */}
           {activeTab === 'weekly' && (
             <div className="space-y-8">
-              
+
               {/* Date Range Selector Header */}
               <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div>
