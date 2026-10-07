@@ -108,6 +108,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onNavigateToS
       if (normalizedEmail === 'marketing@navapack.com' && !mergedUser.department) {
         mergedUser = { ...mergedUser, role: 'marketing', department: 'marketing' };
       }
+      if (normalizedEmail === 'pouline01@navapack.com' && !mergedUser.department) {
+        mergedUser = { ...mergedUser, department: 'sales' };
+      }
       onLogin(mergedUser);
     } catch (err) {
       setError('Something went wrong. Please check your backend connection.');

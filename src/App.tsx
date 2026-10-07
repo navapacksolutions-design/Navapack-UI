@@ -328,7 +328,7 @@ export default function App() {
                   handleNavigate(
                     department === 'hr'
                       ? 'hr-dashboard'
-                      : department === 'sales' || department === 'marketing'
+                      : department.includes('sales') || department.includes('marketing')
                         ? 'marketing-dashboard'
                         : 'dashboard',
                     'none'
