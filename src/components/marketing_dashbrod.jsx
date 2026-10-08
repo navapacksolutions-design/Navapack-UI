@@ -88,6 +88,8 @@ const normalizePipelineApiPayload = (form, salespersonMap = []) => {
   const lastContactDate = normalizeApiDate(form.lastContactDate);
   const nextFollowupDate = normalizeApiDate(form.nextFollowUpDate);
   const stageLastUpdated = normalizeApiDate(form.stageLastUpdated);
+  const estimatedQuantity = Number(String(form.estQty || 0).replace(/,/g, '').trim());
+  const estimatedValue = Number(form.estValue || 0);
 
   return {
     prospect_id: form.prospectId || `PRO-${Date.now()}`,
@@ -101,9 +103,10 @@ const normalizePipelineApiPayload = (form, salespersonMap = []) => {
     customer_type: form.customerType || '',
     product_service: form.product || '',
     requirement_specifications: form.specs || '',
-    estimated_quantity: Number(form.estQty || 0),
+    estimated_quantity: estimatedQuantity,
     unit: form.unit || 'Pcs',
-    estimated_value_ugx: Number(form.estValue || 0),
+    estimated_value_ugx: estimatedValue,
+    estimated_price_ugx: estimatedQuantity * estimatedValue,
     ...(lastContactDate ? { last_contact_date: lastContactDate } : {}),
     last_discussion_feedback: form.lastDiscussion || '',
     next_action: form.nextAction || '',
@@ -141,6 +144,7 @@ const normalizePipelineRecord = (item, fallbackId) => ({
   estQty: item?.estimated_quantity || '',
   unit: item?.unit === 'Bags' ? 'CTR' : item?.unit || 'Pcs',
   estValue: Number(item?.estimated_value_ugx || 0),
+  estPrice: Number(item?.estimated_price_ugx ?? (Number(item?.estimated_quantity || 0) * Number(item?.estimated_value_ugx || 0))),
   lastContactDate: item?.last_contact_date || '',
   lastDiscussion: item?.last_discussion_feedback || '',
   nextAction: item?.next_action || '',
@@ -623,8 +627,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     if (!form.salesperson || !form.salesperson.trim()) errors.salesperson = 'Salesperson is required.';
     if (!form.customer || !form.customer.trim()) errors.customer = 'Customer / Company is required.';
     if (!form.location || !form.location.trim()) errors.location = 'Location / Town is required.';
-    if (!form.email || !form.email.trim()) errors.email = 'Mail ID is required.';
-    else if (!EMAIL_REGEX.test(form.email.trim())) errors.email = 'Enter a valid email address.';
+    if (form.email?.trim() && !EMAIL_REGEX.test(form.email.trim())) errors.email = 'Enter a valid email address.';
     if (!form.nextFollowUpDate) errors.nextFollowUpDate = 'Next Follow-up Date is required.';
     else if (form.nextFollowUpDate < localDateString()) errors.nextFollowUpDate = 'Next Follow-up Date must be today or later.';
     if (form.telephone && !PHONE_REGEX.test(form.telephone.trim())) {
@@ -639,7 +642,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   const validateActivityForm = (form) => {
     const errors = {};
     if (form.telephone && !PHONE_REGEX.test(form.telephone.trim())) errors.telephone = 'Enter a valid phone number.';
-    if (form.email && !EMAIL_REGEX.test(form.email.trim())) errors.email = 'Enter a valid email address.';
+    if (form.email?.trim() && !EMAIL_REGEX.test(form.email.trim())) errors.email = 'Enter a valid email address.';
     if (form.nextFollowUpDate && form.nextFollowUpDate < localDateString()) errors.nextFollowUpDate = 'Next Follow-up Date must be today or later.';
     if (form.requiredByDate && form.requiredByDate < localDateString()) errors.requiredByDate = 'Required By Date must be today or later.';
     if (!form.date) errors.date = 'Date is required.';
@@ -726,7 +729,7 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
     specs: '',
     estQty: '',
     unit: units[0] || 'Pcs',
-    estValue: 0,
+    estValue: '',
     lastContactDate: new Date().toISOString().split('T')[0],
     lastDiscussion: '',
     nextAction: '',
@@ -746,6 +749,15 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
   };
 
   const [pipelineForm, setPipelineForm] = useState(emptyPipelineForm);
+  const estimatedQuantity = Number(String(pipelineForm.estQty ?? '').replace(/,/g, '').trim());
+  const estimatedUnitValue = Number(pipelineForm.estValue);
+  const estimatedPrice = String(pipelineForm.estQty ?? '').trim() !== ''
+    && String(pipelineForm.estValue ?? '').trim() !== ''
+    && Number.isFinite(estimatedQuantity)
+    && Number.isFinite(estimatedUnitValue)
+    && Number.isFinite(estimatedQuantity * estimatedUnitValue)
+    ? estimatedQuantity * estimatedUnitValue
+    : '';
 
   const emptyActivityForm = {
     id: '',
@@ -3057,7 +3069,7 @@ useEffect(() => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Email *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Email</label>
                   <input
                     type="email"
                     value={pipelineForm.email}
@@ -3139,6 +3151,7 @@ useEffect(() => {
                   <label className="block font-semibold text-slate-700 mb-1">Est Quantity</label>
                   <input
                     type="text"
+                    inputMode="decimal"
                     value={pipelineForm.estQty}
                     onChange={(e) => setPipelineForm({ ...pipelineForm, estQty: e.target.value })}
                     className="w-full border border-slate-300 rounded p-2"
@@ -3150,9 +3163,10 @@ useEffect(() => {
                   <input
                     type="number"
                     min="0"
+                    step="any"
                     value={pipelineForm.estValue}
                     onChange={(e) => {
-                      setPipelineForm({ ...pipelineForm, estValue: Number(e.target.value) });
+                      setPipelineForm({ ...pipelineForm, estValue: e.target.value });
                       if (pipelineFormErrors.estValue) setPipelineFormErrors({ ...pipelineFormErrors, estValue: undefined });
                     }}
                     className={`w-full border rounded p-2 focus:ring-2 ${fieldErrorClass(pipelineFormErrors.estValue)}`}
@@ -3160,6 +3174,19 @@ useEffect(() => {
                   {pipelineFormErrors.estValue && (
                     <p className="mt-1 text-[11px] font-medium text-rose-600">{pipelineFormErrors.estValue}</p>
                   )}
+                </div>
+
+                <div>
+                  <label htmlFor="pipeline-estimated-price" className="block font-semibold text-slate-700 mb-1">Estimated Price (UGX)</label>
+                  <input
+                    id="pipeline-estimated-price"
+                    type="text"
+                    readOnly
+                    value={estimatedPrice === '' ? '' : `${estimatedPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })} UGX`}
+                    placeholder="Calculated automatically"
+                    className="w-full border border-slate-300 rounded p-2 bg-slate-50"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">Est Quantity × Est Value</p>
                 </div>
 
                 <div>
