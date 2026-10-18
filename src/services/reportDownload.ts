@@ -24,10 +24,11 @@ function errorMessage(payload: unknown): string {
   return '';
 }
 
-export async function downloadReport(fromDate: string, toDate: string, format: ReportFormat, signal?: AbortSignal) {
+export async function downloadReport(fromDate: string, toDate: string, format: ReportFormat, signal?: AbortSignal, salespersonId = '') {
   const validationError = validateReportDates(fromDate, toDate);
   if (validationError) throw new Error(validationError);
   const params = new URLSearchParams({ from_date: fromDate, to_date: toDate });
+  if (salespersonId) params.set('salesperson', salespersonId);
   const response = await authenticatedFetch(
     `https://api.navapacksolutions.com/api/reports/export/${format}/?${params}`,
     { method: 'GET', signal },
@@ -43,7 +44,7 @@ export async function downloadReport(fromDate: string, toDate: string, format: R
   const link = document.createElement('a');
   try {
     link.href = url;
-    link.download = `Navapack_Report_${fromDate}_to_${toDate}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+    link.download = `Navapack_Report_${salespersonId ? `Salesperson_${salespersonId}_` : ''}${fromDate}_to_${toDate}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
     document.body.appendChild(link);
     link.click();
   } finally {

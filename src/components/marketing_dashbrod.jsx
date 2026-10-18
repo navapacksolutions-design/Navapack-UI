@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import './marketingTheme.css';
 import navapackLogo from '../assets/Nava-logo.png';
 import { authenticatedFetch } from '../services/tokenAuth';
+import { followupStatus, isActiveFollowup } from '../utils/followupStatus';
+import { SalespersonPasswordModal } from './SalespersonPasswordModal';
 import { ReportDownloadModal } from './ReportDownloadModal';
 import { ownsSalesRecord, localDateString } from '../utils/salesRecordAccess';
 import { isSalesDepartment } from '../utils/departmentRouting';
@@ -237,7 +239,7 @@ const normalizeDashboardMetrics = (payload) => ({
     noDateSet: Number(payload?.critical_action?.no_date_set || 0)
   },
   pipelineHealth: {
-    activeOpportunities: Number(payload?.pipeline_health?.active_opportunities || 0),
+    activeOpportunities: Number(payload?.pipeline_health?.active_followups ?? payload?.pipeline_health?.active_opportunities ?? 0),
     totalPipelineValue: Number(payload?.pipeline_health?.total_pipeline_value || 0),
     quotationsPending: Number(payload?.pipeline_health?.quotations_pending || 0)
   },
@@ -518,6 +520,8 @@ export default function App({ onLogout, department = 'marketing', user = {} }) {
       // Theme switching still works when browser storage is unavailable.
     }
   }, [theme]);
+  const [passwordPerson, setPasswordPerson] = useState(null);
+  const canUpdateSalesPasswords = String(department || '').toLowerCase().includes('marketing');
   const isSalesUser = isSalesDepartment(department);
   const sameDayEditMessage = 'Sales users can only edit their own Customer Pipeline and Daily Activity records dated today.';
   const canEditRecord = (record) => !isSalesUser || (record && ownsSalesRecord(record, user, salespersonData) && (record.dateAdded ?? record.date) === localDateString());
@@ -1031,7 +1035,7 @@ useEffect(() => {
       overdueFollowUps,
       followUpsToday,
       noDateSetAlert,
-      activeOpportunitiesCount: activeOps.length,
+      activeOpportunitiesCount: pipelineData.filter(isActiveFollowup).length,
       totalPipelineVal,
       quotationsPending,
       ordersWonMTD,
@@ -1671,7 +1675,7 @@ useEffect(() => {
                   </div>
                   <div className="mt-4 space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-cyan-950">Active Opportunities:</span>
+                      <span className="text-sm font-medium text-cyan-950">Active Follow-ups:</span>
                       <span className="text-xl font-extrabold text-cyan-800 bg-white/80 px-2.5 py-0.5 rounded-lg border border-cyan-200">
                         {metrics.activeOpportunitiesCount}
                       </span>
@@ -1936,11 +1940,11 @@ useEffect(() => {
                           <td className="p-2 border-r border-slate-200 font-medium text-slate-800">{item.nextFollowUpDate}</td>
                           <td className="p-2 border-r border-slate-200">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              item.followUpStatus === 'Overdue' ? 'bg-pink-100 text-pink-800' :
-                              item.followUpStatus === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
+                              followupStatus(item) === 'Overdue' ? 'bg-pink-100 text-pink-800' :
+                              followupStatus(item) === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
                               'bg-amber-100 text-amber-800'
                             }`}>
-                              {item.followUpStatus}
+                              {followupStatus(item)}
                             </span>
                           </td>
                           <td className="p-2 border-r border-slate-200">
@@ -2057,6 +2061,7 @@ useEffect(() => {
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
+                              {canUpdateSalesPasswords && <button type="button" onClick={() => setPasswordPerson(person)} className="px-2 py-1 rounded text-sky-700 hover:bg-sky-50" title="Update salesperson password">Update password</button>}
                               <button
                                 type="button"
                                 onClick={() => handleEditSalesperson(person)}
@@ -2504,7 +2509,7 @@ useEffect(() => {
                         <table className="w-full text-left border-collapse text-xs">
                           <thead className="bg-slate-100 font-bold"><tr><th className="p-2.5">Date</th><th className="p-2.5">Salesperson</th><th className="p-2.5">Customer</th><th className="p-2.5">Information</th></tr></thead>
                           <tbody className="divide-y divide-slate-200">
-                            {(weeklyReport.market_intelligence || []).map((item, index) => <tr key={item.id || index}><td className="p-2.5">{item.date}</td><td className="p-2.5">{item.salesperson}</td><td className="p-2.5 font-semibold">{item.customer || item.customer_company}</td><td className="p-2.5">{item.market_intelligence || item.market_competitor_intelligence || item.information}</td></tr>)}
+                            {(weeklyReport.market_intelligence || []).map((item, index) => <tr key={item.id || index}><td className="p-2.5">{item.date}</td><td className="p-2.5">{item.salesperson}</td><td className="p-2.5 font-semibold">{item.customer || item.customer_company}</td><td className="p-2.5">{item.intelligence || item.market_intelligence || item.market_competitor_intelligence || item.information}</td></tr>)}
                           </tbody>
                         </table>
                       </div>
@@ -2516,7 +2521,7 @@ useEffect(() => {
                         <table className="w-full text-left border-collapse text-xs">
                           <thead className="bg-slate-100 font-bold"><tr><th className="p-2.5">Customer</th><th className="p-2.5">Salesperson</th><th className="p-2.5">Support Needed</th><th className="p-2.5">Status</th></tr></thead>
                           <tbody className="divide-y divide-slate-200">
-                            {(weeklyReport.management_delays || []).map((item, index) => <tr key={item.id || index}><td className="p-2.5 font-semibold">{item.customer || item.customer_company}</td><td className="p-2.5">{item.salesperson}</td><td className="p-2.5">{item.management_support_needed || item.support_needed}</td><td className="p-2.5">{item.issue_status || item.status}</td></tr>)}
+                            {(weeklyReport.management_delays || []).map((item, index) => <tr key={item.id || index}><td className="p-2.5 font-semibold">{item.customer || item.customer_company}</td><td className="p-2.5">{item.salesperson}</td><td className="p-2.5">{item.support_required || item.management_support_needed || item.support_needed}</td><td className="p-2.5">{item.issue_status || item.status}</td></tr>)}
                           </tbody>
                         </table>
                       </div>
@@ -2659,7 +2664,7 @@ useEffect(() => {
                       <tr>
                         <td className="p-2.5 border-r border-slate-200 text-pink-700 font-semibold">Active Overdue Follow-ups</td>
                         {salespersons.map(rep => {
-                          const val = pipelineData.filter(p => p.salesperson === rep && p.followUpStatus === 'Overdue').length;
+                          const val = pipelineData.filter(p => p.salesperson === rep && followupStatus(p) === 'Overdue').length;
                           return <td key={rep} className="p-2.5 text-center border-r border-slate-200 font-bold text-pink-700">{val}</td>;
                         })}
                         <td className="p-2.5 text-center bg-pink-100 font-bold text-pink-900">
@@ -3004,7 +3009,7 @@ useEffect(() => {
       {/* ======================================================== */}
 
       {/* PIPELINE ADD / EDIT MODAL */}
-      {isReportDownloadOpen && <ReportDownloadModal onClose={() => setIsReportDownloadOpen(false)} />}
+      {isReportDownloadOpen && <ReportDownloadModal salespeople={salespersonData} salespeopleLoading={salespersonsLoading} salespeopleError={salespersonsError} onClose={() => setIsReportDownloadOpen(false)} />}
       {isPipelineModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -3615,6 +3620,8 @@ useEffect(() => {
           </div>
         </div>
       )}
+
+      {passwordPerson && <SalespersonPasswordModal person={passwordPerson} onClose={() => setPasswordPerson(null)} />}
 
       {isSalespersonModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">

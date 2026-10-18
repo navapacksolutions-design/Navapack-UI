@@ -1,5 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { followupStatus, isActiveFollowup } from '../src/utils/followupStatus';
+test('follow-up status uses dates and only completed follow-ups are inactive', () => {
+ const today = '2026-10-18';
+ assert.equal(followupStatus({nextFollowUpDate:'2026-10-17'}, today), 'Overdue');
+ assert.equal(followupStatus({nextFollowUpDate:today}, today), 'Due Today');
+ assert.equal(followupStatus({nextFollowUpDate:'2026-10-19', followUpStatus:'Overdue'}, today), 'Pending');
+ assert.equal(followupStatus({nextFollowUpDate:'2026-10-17', followUpStatus:'Completed'}, today), 'Completed');
+ for (const salesStage of ['Won','Lost','Order Won','Order Lost']) assert.equal(followupStatus({salesStage, nextFollowUpDate:'2026-10-17'}, today), 'Overdue');
+ assert.equal(followupStatus({}, today), 'No Date Set');
+ for (const followUpStatus of ['Pending','Overdue','Due Today','',undefined]) assert.equal(isActiveFollowup({followUpStatus}), true);
+ assert.equal(isActiveFollowup({followUpStatus:' Completed '}), false);
+});
 import { build } from 'esbuild';
 import { downloadReport, validateReportDates } from '../src/services/reportDownload';
 import { canEditSalesRecord, localDateString, ownsSalesRecord } from '../src/utils/salesRecordAccess';
@@ -78,8 +90,14 @@ test('export validation, binary downloads, errors, authentication and retry', as
       await downloadReport('2026-09-01', '2026-09-30', format);
     }
     assert.deepEqual(filenames, ['Navapack_Report_2026-09-01_to_2026-09-30.xlsx', 'Navapack_Report_2026-09-01_to_2026-09-30.pdf']);
-    assert.equal(clicks, 2);
-    assert.equal(removed, 2);
+    globalThis.fetch = async (url) => {
+      assert.equal(new URL(String(url)).searchParams.get('salesperson'), '12');
+      return new Response('individual report');
+    };
+    await downloadReport('2026-09-01', '2026-09-30', 'excel', undefined, '12');
+    assert.equal(filenames[2], 'Navapack_Report_Salesperson_12_2026-09-01_to_2026-09-30.xlsx');
+    assert.equal(clicks, 3);
+    assert.equal(removed, 3);
     for (const status of [400, 403, 500]) {
       globalThis.fetch = async () => new Response(new Blob([JSON.stringify({ detail: 'Export unavailable. Retry.' })]), { status });
       await assert.rejects(downloadReport('2026-09-01', '2026-09-30', 'pdf'), /Export unavailable/);
@@ -93,7 +111,7 @@ test('export validation, binary downloads, errors, authentication and retry', as
     assert.equal(storage.has('navapack_token'), false);
     await assert.rejects(downloadReport('2026-09-01', '2026-09-30', 'pdf'), /log in again/);
     await new Promise(resolve => setTimeout(resolve, 1100));
-    assert.equal(revoked, 3);
+    assert.equal(revoked, 4);
   } finally {
     URL.createObjectURL = originalCreate;
     URL.revokeObjectURL = originalRevoke;

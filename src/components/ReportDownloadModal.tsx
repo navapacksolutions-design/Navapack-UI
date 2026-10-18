@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Download, XCircle } from 'lucide-react';
 import { downloadReport, ReportFormat, validateReportDates } from '../services/reportDownload';
 
-export function ReportDownloadModal({ onClose }: { onClose: () => void }) {
+export function ReportDownloadModal({ onClose, salespeople = [], salespeopleLoading = false, salespeopleError = '' }: { onClose: () => void; salespeople?: { id: number | string; name: string }[]; salespeopleLoading?: boolean; salespeopleError?: string }) {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [format, setFormat] = useState<ReportFormat>('excel');
+  const [salespersonId, setSalespersonId] = useState('');
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -31,7 +32,7 @@ export function ReportDownloadModal({ onClose }: { onClose: () => void }) {
     request.current = controller;
     setDownloading(true);
     try {
-      await downloadReport(fromDate, toDate, format, controller.signal);
+      await downloadReport(fromDate, toDate, format, controller.signal, salespersonId);
       onClose();
     } catch (err) {
       if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Could not download the report. Please try again.');
@@ -57,6 +58,14 @@ export function ReportDownloadModal({ onClose }: { onClose: () => void }) {
             <input autoFocus id="report-from-date" type="date" required value={fromDate} disabled={downloading} onChange={event => setFromDate(event.target.value)} className={fieldClass} /></div>
           <div><label htmlFor="report-to-date" className="block font-semibold text-slate-700 mb-1">To Date *</label>
             <input id="report-to-date" type="date" required value={toDate} disabled={downloading} onChange={event => setToDate(event.target.value)} className={fieldClass} /></div>
+        </div>
+        <div><label htmlFor="report-salesperson" className="block font-semibold text-slate-700 mb-1">Salesperson</label>
+          <select id="report-salesperson" value={salespersonId} disabled={downloading || salespeopleLoading} onChange={event => setSalespersonId(event.target.value)} className={fieldClass}>
+            <option value="">All salespeople</option>
+            {salespeople.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
+          </select>
+          {salespeopleLoading && <p role="status">Loading salespeople…</p>}
+          {salespeopleError && <p role="alert" className="text-red-800">{salespeopleError}</p>}
         </div>
         <div><label htmlFor="report-format" className="block font-semibold text-slate-700 mb-1">Format</label>
           <select id="report-format" value={format} disabled={downloading} onChange={event => setFormat(event.target.value as ReportFormat)} className={fieldClass}>
