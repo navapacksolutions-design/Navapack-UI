@@ -52,6 +52,7 @@ export function ReportDownloadModal({ onClose, salespeople = [], salespeopleLoad
         <button type="button" onClick={onClose} aria-label="Close download report" className="hover:bg-sky-700 p-1 rounded focus-visible:outline-2"><XCircle className="w-5 h-5" /></button>
       </div>
       <form onSubmit={submit} noValidate className="p-6 space-y-4 text-sm" aria-busy={downloading}>
+        <p className="text-slate-600">Excel includes an Overall Report sheet listing every daily activity and pipeline entry for the selected salesperson and date range, with all entered details in one list. Entries are selected by activity date or pipeline date added.</p>
         {error && <p id="report-download-error" role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">{error}</p>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label htmlFor="report-from-date" className="block font-semibold text-slate-700 mb-1">From Date *</label>
